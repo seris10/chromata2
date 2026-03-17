@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromata Experiments - Fast Photorealistic Image Tracing</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chromata Experiments</h1>
+            <p class="subtitle">Fast Photorealistic Image Tracing with AI-Enhanced Path-Finding</p>
+        </header>
+
+        <main>
+            <!-- Image Upload Section -->
+            <section class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="imageInput" accept="image/*" hidden>
+                    <label for="imageInput" class="upload-label">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                        <span>Click to upload image or drag and drop</span>
+                        <span class="upload-hint">PNG, JPG up to 10MB</span>
+                    </label>
+                </div>
+
+                <img id="sourceImage" style="display: none;" crossorigin="anonymous">
+            </section>
+
+            <!-- Preset Selection -->
+            <section class="preset-section">
+                <h2>Choose a Preset</h2>
+                <div class="preset-buttons">
+                    <button class="preset-btn" data-preset="fast">
+                        <span class="preset-name">Fast</span>
+                        <span class="preset-time">1-2 seconds</span>
+                    </button>
+                    <button class="preset-btn active" data-preset="balanced">
+                        <span class="preset-name">Balanced</span>
+                        <span class="preset-time">3-5 seconds</span>
+                        <span class="preset-badge">Recommended</span>
+                    </button>
+                    <button class="preset-btn" data-preset="portrait">
+                        <span class="preset-name">Portrait</span>
+                        <span class="preset-time">5-7 seconds</span>
+                    </button>
+                    <button class="preset-btn" data-preset="photorealistic">
+                        <span class="preset-name">Photorealistic</span>
+                        <span class="preset-time">5-8 seconds</span>
+                    </button>
+                    <button class="preset-btn" data-preset="experimental">
+                        <span class="preset-name">Experimental</span>
+                        <span class="preset-time">8-12 seconds</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Controls -->
+            <section class="controls-section">
+                <button id="startBtn" class="btn btn-primary" disabled>
+                    <span>Start Processing</span>
+                </button>
+                <button id="pauseBtn" class="btn btn-secondary" disabled>
+                    <span>Pause</span>
+                </button>
+                <button id="resetBtn" class="btn btn-secondary" disabled>
+                    <span>Reset</span>
+                </button>
+                <button id="downloadBtn" class="btn btn-success" disabled>
+                    <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                    </svg>
+                    <span>Download Result</span>
+                </button>
+            </section>
+
+            <!-- Progress Section -->
+            <section class="progress-section" id="progressSection" style="display: none;">
+                <div class="progress-header">
+                    <h3>Processing...</h3>
+                    <span id="timeElapsed">0.0s</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-stats">
+                    <div class="stat">
+                        <span class="stat-label">Iterations:</span>
+                        <span class="stat-value" id="iterations">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Faces Detected:</span>
+                        <span class="stat-value" id="facesDetected">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">FPS:</span>
+                        <span class="stat-value" id="fps">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Mode:</span>
+                        <span class="stat-value" id="colorMode">Weighted RGB</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Canvas Container -->
+            <section class="canvas-section" id="canvasSection">
+                <!-- Canvas will be injected here by Chromata -->
+            </section>
+        </main>
+
+        <footer>
+            <p>
+                Enhanced version of <a href="https://github.com/michaelbromley/chromata" target="_blank">Chromata</a>
+                by Michael Bromley
+            </p>
+            <p class="enhancements">
+                Enhancements: WebGL Edge Detection • Perceptual Color Matching • Face Detection • Adaptive Sampling
+            </p>
+        </footer>
+    </div>
+
+    <!-- Load OpenCV.js first -->
+    <script async src="lib/opencv.js" onload="console.log('OpenCV.js loaded')"></script>
+
+    <!-- Main application bundle (will be created by webpack) -->
+    <script src="bundle.js"></script>
+</body>
+</html>

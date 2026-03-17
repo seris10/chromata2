@@ -1,0 +1,397 @@
+{
+  "meta": {
+    "title": "Chromata Library Reference",
+    "description": "Path-tracing visual effects library for images",
+    "original_author": "Michael Bromley",
+    "custom_extensions_by": "kjr",
+    "last_updated": "2026-03-01",
+    "source_path": "/Users/kreed/workspace/chromata/"
+  },
+
+  "files": {
+    "custom_build": "chromata-custom.js",
+    "original_minified": "chromata.min.js",
+    "demo_ui": "index.html",
+    "dashboard_html": "dashboard.html",
+    "source_dir": "src/"
+  },
+
+  "architecture": {
+    "data_flow": [
+      "1. Image loads into sourceCanvas",
+      "2. Optional edge detection pre-processing (custom)",
+      "3. Image converted to flat Uint8Array pixelData[(row*w+col)*4+ch]",
+      "4. PathFinders seeded at origin positions",
+      "5. Animation loop: pathfinders read pixels, calculate next position",
+      "6. PathRenderers draw lines/curves/dots to renderCanvas"
+    ],
+    "pathfinder_algorithm": "Samples arc ahead (turningAngle width, sampleSize divisions), finds pixel with best color match based on key (low=bright, high=dark), avoids visited pixels via workingArray, bounces at canvas edges"
+  },
+
+  "classes": {
+    "Chromata": {
+      "file": "chromata.js",
+      "role": "Main orchestrator",
+      "description": "Loads images, manages animation loop, coordinates pathfinders and renderers",
+      "methods": {
+        "constructor(imageElement, options)": "Initialize canvases, load image, merge options",
+        "start()": "Begin animation loop",
+        "stop()": "Pause animation, return iteration count",
+        "toggle()": "Start/stop toggle",
+        "reset()": "Clear canvas, reset workingArray, remove render canvas",
+        "_mergeOptions(options)": "Merge user config with defaults, validate ranges",
+        "_limitToRange(val, low, high)": "Clamp value to range",
+        "_appendRenderCanvas()": "Hide source image, insert render canvas into DOM",
+        "_removeRenderCanvas()": "Show source image, remove render canvas",
+        "_run()": "Initialize PRNG, pathfinders, renderers; start fixed-timestep tick loop",
+        "exportSVG()": "Collect SVG paths from all renderers, return complete SVG document string",
+        "getStats()": "Return {iterations, fps, pathfinders} for monitor display",
+        "_initPathFinders()": "Create pathfinder array based on origins",
+        "_seedTop(count, pathFinders, options)": "Spawn pathfinders from top edge",
+        "_seedBottom(count, pathFinders, options)": "Spawn pathfinders from bottom edge",
+        "_seedLeft(count, pathFinders, options)": "Spawn pathfinders from left edge",
+        "_seedRight(count, pathFinders, options)": "Spawn pathfinders from right edge",
+        "_seedPoint(count, pathFinders, options, xPc, yPc)": "Spawn from percentage coordinate",
+        "_seedCreateLoop(count, pathFinders, xPosFn, yPosFn, options)": "Helper for edge seeding"
+      }
+    },
+
+    "PathFinder": {
+      "file": "pathFinder.js",
+      "role": "Navigation algorithm",
+      "description": "Determines next pixel to visit based on color matching and direction",
+      "methods": {
+        "constructor(pixelData, workingData, width, height, targetColor, initX, initY, options)": "Initialize with flat typed arrays, dimensions, position, target color",
+        "getNextPoint()": "Main entry - get next coordinate, retry up to 5 times if not pristine",
+        "_getNextPixel()": "Core algorithm - sample arc, find best match, update position",
+        "getColor()": "Return target color as {r, g, b}",
+        "_getVelocityAngle()": "Calculate direction angle, handle edge bouncing",
+        "_hexToRgb(hex)": "Convert hex color to [r, g, b] array",
+        "_getColorDistance(pixel)": "Calculate distance from pixel to target color",
+        "_isInRange(x, y)": "Check if coordinates are within canvas bounds",
+        "_updateWorkingArray(row, col)": "Mark pixel as visited",
+        "_getRgbIndex(targetColorArray)": "Determine which RGB channel to track"
+      }
+    },
+
+    "PathRenderer": {
+      "file": "pathRenderer.js",
+      "role": "Drawing engine",
+      "description": "Renders paths as smooth curves, straight lines, or dots",
+      "methods": {
+        "constructor(context, pathFinder, options)": "Setup canvas context, get pathfinder color, init SVG recording (svgPath, svgCircles)",
+        "drawNextLine()": "Dispatch to appropriate draw method based on lineMode",
+        "_drawLineSmooth()": "Quadratic bezier curves with gradient + SVG Q commands",
+        "_drawLineSquare()": "Straight line segments with gradient + SVG L commands",
+        "_drawPoint()": "Circular dots + SVG circle recording",
+        "_getLineLength(p1, p2)": "Euclidean distance between points",
+        "_createGradient(p1, p2, color1, color2)": "Create linear gradient between points",
+        "_getStrokeColor(colorValue)": "Generate RGBA string based on colorMode and opacity"
+      }
+    },
+
+    "PathQueue": {
+      "file": "pathQueue.js",
+      "role": "Path history buffer",
+      "description": "Fixed-size queue for remembering recent path positions",
+      "methods": {
+        "constructor(size)": "Create queue with max size",
+        "put(item)": "Add item, discard oldest if over size",
+        "get(index)": "Retrieve by index (positive from start, negative from end)",
+        "contains(item)": "Check if point exists in queue"
+      }
+    },
+
+    "Utils": {
+      "file": "utils.js",
+      "role": "Static utilities",
+      "description": "Helper functions for image processing and setup",
+      "methods": {
+        "_indexToRgbString(i)": "Assign RGB color to pathfinder (cycles red/green/blue)",
+        "_getPixelData(sourceContext)": "Return flat Uint8Array copy of canvas pixel data",
+        "_getWorkingData(sourceContext)": "Return zeroed Uint8Array(width*height*3) for visit tracking",
+        "_getOutputDimensions(image, size)": "Calculate output dimensions based on size option"
+      }
+    },
+
+    "ImageProcessor": {
+      "file": "chromata-custom.js",
+      "role": "Image pre-processing (CUSTOM)",
+      "description": "Edge detection and blending for sketch effects",
+      "methods": {
+        "detectEdges(sourceContext, strength)": "Sobel edge detection - emphasizes contours",
+        "blendEdges(sourceContext, originalData, edgeMix)": "Blend edge-detected with original image"
+      }
+    }
+  },
+
+  "parameters": {
+    "original": {
+      "colorMode": {
+        "type": "string",
+        "values": ["color", "greyscale"],
+        "default": "color",
+        "description": "RGB color cycling vs monochrome output"
+      },
+      "compositeOperation": {
+        "type": "string",
+        "values": ["lighten", "darken", "source-over", "difference", "screen", "multiply", "overlay"],
+        "default": "lighten",
+        "description": "Canvas blend mode for drawing"
+      },
+      "iterationLimit": {
+        "type": "number",
+        "default": 0,
+        "description": "Stop after N iterations (0 = unlimited)"
+      },
+      "key": {
+        "type": "string",
+        "values": ["low", "high"],
+        "default": "low",
+        "description": "low = seek bright pixels, high = seek dark pixels"
+      },
+      "lineWidth": {
+        "type": "number",
+        "range": [1, 100],
+        "default": 2,
+        "description": "Stroke thickness in pixels"
+      },
+      "lineMode": {
+        "type": "string",
+        "values": ["smooth", "square", "point"],
+        "default": "smooth",
+        "description": "smooth = curves, square = straight lines, point = dots"
+      },
+      "origin": {
+        "type": "array",
+        "values": ["top", "bottom", "left", "right", "X% Y%"],
+        "default": ["bottom"],
+        "description": "Where pathfinders spawn from"
+      },
+      "outputSize": {
+        "type": "string",
+        "values": ["original", "container"],
+        "default": "original",
+        "description": "Use original image size or fit to container"
+      },
+      "pathFinderCount": {
+        "type": "number",
+        "range": [1, 10000],
+        "default": 30,
+        "description": "Number of simultaneous path tracers"
+      },
+      "speed": {
+        "type": "number",
+        "range": [1, 100],
+        "default": 7,
+        "description": "Pixels traveled per animation step"
+      },
+      "turningAngle": {
+        "type": "number",
+        "range": [0.1, 10],
+        "default": "Math.PI (3.14159)",
+        "unit": "radians",
+        "description": "Arc width for direction sampling. π/8=22.5°, π/4=45°, π/2=90°, π=180°, 2π=360°"
+      }
+    },
+
+    "custom": {
+      "sampleSize": {
+        "type": "number",
+        "range": [2, 32],
+        "default": 16,
+        "description": "Directions tested within turning arc. Higher = smoother paths, lower = angular/choppy",
+        "location": "PathFinder._getNextPixel()"
+      },
+      "lineOpacity": {
+        "type": "number",
+        "range": [0, 1],
+        "default": 1,
+        "description": "Line transparency for layered/soft effects",
+        "location": "PathRenderer._getStrokeColor()"
+      },
+      "jitter": {
+        "type": "number",
+        "range": [0, 2],
+        "default": 0,
+        "description": "Random wobble for hand-drawn feel. Applied as: theta += (random-0.5) * jitter * π",
+        "location": "PathFinder._getNextPixel()"
+      },
+      "edgeDetect": {
+        "type": "number",
+        "range": [0, 1],
+        "default": 0,
+        "description": "Sobel edge detection mix. 0=original, 0.5=blended, 1=pure edges. Critical for sketch effects",
+        "location": "Chromata constructor, ImageProcessor"
+      },
+      "edgeStrength": {
+        "type": "number",
+        "range": [0.5, 3],
+        "default": 1,
+        "description": "Edge detection intensity multiplier",
+        "location": "ImageProcessor.detectEdges()"
+      },
+      "stepsPerFrame": {
+        "type": "number",
+        "range": [1, 20],
+        "default": 1,
+        "description": "Decouples visual speed from tracing accuracy. Each animation frame, pathfinders take this many steps. speed=3 + stepsPerFrame=6 gives visual rate of 18px/frame with 3px tracing precision.",
+        "location": "Chromata._tick()"
+      },
+      "pathMemory": {
+        "type": "number",
+        "default": 10,
+        "description": "PathQueue size - points remembered for backtracking",
+        "location": "PathFinder constructor"
+      },
+      "alphaThreshold": {
+        "type": "number",
+        "range": [1, 255],
+        "default": 255,
+        "description": "Minimum alpha value for pathfinders to visit a pixel. 255=only fully opaque (default), 1=skip only fully transparent, 128=reasonable threshold for anti-aliased edges. Use lower values to trace images with transparency without coloring transparent background.",
+        "location": "PathFinder._getNextPixel()"
+      },
+      "seed": {
+        "type": "number|null",
+        "default": null,
+        "description": "Seed for reproducible renders. null=random (Math.random), any integer=deterministic output via mulberry32 PRNG. Same seed + same settings = identical output every time.",
+        "location": "Chromata._run(), PathFinder._getNextPixel()"
+      }
+    },
+
+    "architecture_changes_v2": {
+      "delta_time": "Fixed-timestep accumulator (16.67ms steps) ensures consistent simulation speed across 60Hz/120Hz/144Hz displays. Movement is identical regardless of frame rate.",
+      "typed_arrays": "pixelArray and workingArray replaced with flat Uint8Array. pixelData[(row*width+col)*4+channel] replaces pixelArray[row][col][channel]. Eliminates ~800K small array allocations for a 1000x800 image.",
+      "seeded_prng": "mulberry32 PRNG replaces Math.random() in jitter calculations when seed is provided. Passes BigCrush statistical test.",
+      "svg_recording": "PathRenderer records SVG path commands (M/Q/L) and circle coordinates during drawing. exportSVG() collects all renderer paths into a complete SVG document.",
+      "fps_tracking": "Smoothed FPS (exponential moving average, 0.9 weight) calculated from frame timestamps in _tick().",
+      "tweakpane_ui": "Tweakpane v4 replaces manual HTML controls. Folders: Controls, Presets (built-in + user saved), Display, Path Finders, Origins, Export, Monitor.",
+      "export_suite": "PNG (canvas.toDataURL), WebM video (MediaRecorder + captureStream), SVG vector (exportSVG method)"
+    }
+  },
+
+  "presets": {
+    "fractal": {
+      "description": "Default organic branching pattern",
+      "key_settings": {"colorMode": "color", "compositeOperation": "lighten", "origin": ["bottom"]}
+    },
+    "lines": {
+      "description": "Vertical lines from top and bottom",
+      "key_settings": {"lineMode": "square", "origin": ["bottom", "top"], "turningAngle": 0.5}
+    },
+    "impressionism": {
+      "description": "Pointillist dots from all directions",
+      "key_settings": {"lineMode": "point", "origin": ["bottom", "top", "left", "right"], "pathFinderCount": 100}
+    },
+    "geometry": {
+      "description": "Angular geometric patterns",
+      "key_settings": {"key": "high", "lineMode": "square", "turningAngle": 0.5}
+    },
+    "halftone": {
+      "description": "Greyscale dot pattern from sides",
+      "key_settings": {"colorMode": "greyscale", "lineMode": "point", "origin": ["left", "right"]}
+    },
+    "neon": {
+      "description": "Bright flowing neon lines",
+      "key_settings": {"lineWidth": 3, "speed": 12}
+    },
+    "pixel": {
+      "description": "Chunky pixel-art style",
+      "key_settings": {"lineMode": "square", "lineWidth": 5, "turningAngle": 0.3}
+    },
+    "sketch": {
+      "description": "Original sketch preset",
+      "key_settings": {"colorMode": "greyscale", "compositeOperation": "darken", "key": "high"}
+    },
+    "pencil-sketch-recommended": {
+      "description": "Optimized pencil sketch with jitter and edge detection",
+      "key_settings": {
+        "colorMode": "greyscale",
+        "compositeOperation": "darken",
+        "key": "high",
+        "lineWidth": 1,
+        "origin": ["bottom", "top", "left", "right"],
+        "pathFinderCount": 200,
+        "jitter": 25,
+        "edgeDetect": 60,
+        "lineOpacity": 70
+      }
+    }
+  },
+
+  "improvement_ideas": [
+    {
+      "name": "Line Pressure/Taper",
+      "priority": "high",
+      "description": "Vary line width along path - start thick, taper to thin for natural brush/pen feel",
+      "implementation": "Modify PathRenderer to track path length and adjust lineWidth progressively",
+      "location": "PathRenderer._drawLineSmooth(), _drawLineSquare()"
+    },
+    {
+      "name": "Paper Texture Overlay",
+      "priority": "high",
+      "description": "Optional grain/texture layer composited over final render",
+      "implementation": "Load texture PNG, composite with multiply blend after animation completes",
+      "location": "Post-processing step in Chromata"
+    },
+    {
+      "name": "Export/Download",
+      "priority": "high",
+      "description": "Save rendered canvas as PNG/JPG",
+      "implementation": "canvas.toDataURL('image/png') with download link",
+      "location": "UI addition to index.html"
+    },
+    {
+      "name": "Canny Edge Detection",
+      "priority": "medium",
+      "description": "More sophisticated than Sobel - includes Gaussian blur and hysteresis thresholding",
+      "implementation": "Add CannyDetector to ImageProcessor with configurable thresholds",
+      "location": "ImageProcessor extension"
+    },
+    {
+      "name": "Multi-Pass Rendering",
+      "priority": "medium",
+      "description": "Run multiple passes with different settings for layered effects",
+      "implementation": "Queue of Chromata configs, render sequentially without clearing canvas",
+      "location": "New MultiPass orchestrator class"
+    },
+    {
+      "name": "Custom Origin Patterns",
+      "priority": "medium",
+      "description": "Spiral, grid, radial burst, edge-following seed patterns",
+      "implementation": "Add _seedSpiral(), _seedGrid(), _seedRadial() methods",
+      "location": "Chromata._initPathFinders()"
+    },
+    {
+      "name": "Animation Recording",
+      "priority": "low",
+      "description": "Capture render progress as video/GIF",
+      "implementation": "Frame capture with MediaRecorder API or gif.js library",
+      "location": "New recorder module"
+    },
+    {
+      "name": "Color Palette Extraction",
+      "priority": "low",
+      "description": "Auto-extract dominant colors from image for pathfinder targets",
+      "implementation": "K-means clustering on pixel colors, replace Utils._indexToRgbString()",
+      "location": "Utils extension"
+    }
+  ],
+
+  "techniques": {
+    "pencil_sketch": {
+      "description": "Create realistic pencil sketch effect",
+      "requirements": [
+        "colorMode: greyscale",
+        "compositeOperation: darken",
+        "key: high (seek dark)",
+        "lineWidth: 1 (thin lines)",
+        "jitter: 20-40% (hand-drawn wobble)",
+        "edgeDetect: 50-80% (follow contours)",
+        "origin: all 4 sides (cross-hatching)",
+        "background: white with 100% alpha"
+      ],
+      "why_it_works": "Edge detection makes paths follow contours. Jitter adds natural wobble. Multiple origins create cross-hatching. Darken composite builds up like pencil strokes. Thin lines with low opacity layer naturally."
+    }
+  }
+}

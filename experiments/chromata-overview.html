@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromata Project Overview</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --card: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+            --purple: #a371f7;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle { color: var(--text-muted); font-size: 1.1rem; }
+
+        .locations {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .location {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1.25rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .location-label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        section {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        h3 {
+            color: var(--text);
+            font-size: 1.1rem;
+            margin: 1.5rem 0 1rem 0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-original { background: var(--success); color: #000; }
+        .badge-added { background: var(--accent); color: #000; }
+        .badge-broken { background: var(--danger); color: #fff; }
+        .badge-proposed { background: var(--purple); color: #fff; }
+        .badge-warning { background: var(--warning); color: #000; }
+
+        ul { list-style: none; }
+
+        li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.9rem;
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .feature-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+        }
+
+        .feature-card h4 {
+            color: var(--text);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        code {
+            background: var(--bg);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.85rem;
+            color: var(--purple);
+        }
+
+        pre {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: var(--text);
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .comparison-table th {
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .comparison-table tr:last-child td { border-bottom: none; }
+
+        .status-icon {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 20px;
+            font-size: 12px;
+            margin-right: 0.5rem;
+        }
+
+        .status-working { background: var(--success); }
+        .status-broken { background: var(--danger); }
+        .status-partial { background: var(--warning); }
+
+        .phase {
+            border-left: 3px solid var(--accent);
+            padding-left: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .phase-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .phase-number {
+            background: var(--accent);
+            color: var(--bg);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .file-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .file-tag {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+
+        .alert {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin: 1rem 0;
+        }
+
+        .alert-title {
+            color: var(--danger);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat {
+            text-align: center;
+            padding: 1rem;
+            background: var(--bg);
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--text-muted);
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chromata Project Overview</h1>
+            <p class="subtitle">Generative digital art tool that traces paths through images</p>
+
+            <div class="locations">
+                <div class="location">
+                    <span class="location-label">Original Source</span>
+                    ~/Downloads/chromata-master/
+                </div>
+                <div class="location">
+                    <span class="location-label">Experiments (Active)</span>
+                    ~/Downloads/chromata-experiments/
+                </div>
+            </div>
+        </header>
+
+        <!-- BASELINE FUNCTIONALITY -->
+        <section>
+            <h2><span class="badge badge-original">Original</span> Baseline Functionality</h2>
+            <p>Chromata is a JavaScript library by Michael Bromley that transforms images into animated artwork using autonomous path-finding agents.</p>
+
+            <h3>How It Works</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>Path Finders</h4>
+                    <p>Autonomous agents seeded at canvas edges that traverse the image, reading pixel color data to determine their path.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Color Distance</h4>
+                    <p>Simple single-channel RGB comparison: <code>MAX - pixel[rgbIndex]</code>. Fast and effective for path decisions.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Arc Sampling</h4>
+                    <p>Fixed sample size of 4 points in a forward arc. Consistent angle steps create smooth, predictable curves.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Rendering</h4>
+                    <p>Two color modes: <code>color</code> (RGB trails) or <code>greyscale</code>. Uses canvas gradients between path points.</p>
+                </div>
+            </div>
+
+            <h3>Original Configuration Options</h3>
+            <table class="comparison-table">
+                <tr>
+                    <th>Option</th>
+                    <th>Default</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td><code>pathFinderCount</code></td>
+                    <td>30</td>
+                    <td>Number of path-finding agents</td>
+                </tr>
+                <tr>
+                    <td><code>colorMode</code></td>
+                    <td>'color'</td>
+                    <td>Rendering mode: 'color' or 'greyscale'</td>
+                </tr>
+                <tr>
+                    <td><code>speed</code></td>
+                    <td>7</td>
+                    <td>Movement speed per frame</td>
+                </tr>
+                <tr>
+                    <td><code>turningAngle</code></td>
+                    <td>Math.PI</td>
+                    <td>Maximum arc angle for sampling</td>
+                </tr>
+                <tr>
+                    <td><code>lineWidth</code></td>
+                    <td>2</td>
+                    <td>Width of rendered paths</td>
+                </tr>
+                <tr>
+                    <td><code>lineMode</code></td>
+                    <td>'smooth'</td>
+                    <td>Line cap style: 'smooth' or 'square'</td>
+                </tr>
+                <tr>
+                    <td><code>origin</code></td>
+                    <td>['bottom']</td>
+                    <td>Where path finders start: top, bottom, left, right, or coordinates</td>
+                </tr>
+                <tr>
+                    <td><code>compositeOperation</code></td>
+                    <td>'lighten'</td>
+                    <td>Canvas blend mode</td>
+                </tr>
+                <tr>
+                    <td><code>iterationLimit</code></td>
+                    <td>0</td>
+                    <td>Auto-stop after N iterations (0 = unlimited)</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- CHANGES MADE -->
+        <section>
+            <h2><span class="badge badge-added">Added</span> Changes Made (Dec 2025)</h2>
+            <p>The chromata-experiments version attempted to add photorealistic rendering with performance optimizations.</p>
+
+            <h3>New Files Added</h3>
+            <div class="file-list">
+                <span class="file-tag">colorSpace.js</span>
+                <span class="file-tag">preprocessing.js</span>
+                <span class="file-tag">faceDetection.js</span>
+                <span class="file-tag">presets.js</span>
+                <span class="file-tag">ui.js</span>
+            </div>
+
+            <h3>Intended Enhancements</h3>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4>CIE LAB Color Distance</h4>
+                    <p>Perceptually uniform color matching using LAB color space with Delta E formula.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Weighted RGB Distance</h4>
+                    <p>Redmean formula accounting for human eye sensitivity to different colors.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>WebGL Edge Detection</h4>
+                    <p>GPU-accelerated Sobel edge detection to guide path finders along image edges.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Face Detection</h4>
+                    <p>OpenCV.js Haar Cascades to detect faces and apply smooth skin rendering.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Adaptive Sampling</h4>
+                    <p>Dynamic arc sample count (2-10) based on edge strength and face regions.</p>
+                </div>
+                <div class="feature-card">
+                    <h4>Gradient Caching</h4>
+                    <p>Reuse canvas gradients by color for ~15% rendering speedup.</p>
+                </div>
+            </div>
+
+            <h3>5 Preset Configurations</h3>
+            <table class="comparison-table">
+                <tr>
+                    <th>Preset</th>
+                    <th>Path Finders</th>
+                    <th>Iterations</th>
+                    <th>Features</th>
+                </tr>
+                <tr>
+                    <td><strong>Fast</strong></td>
+                    <td>15</td>
+                    <td>3,000</td>
+                    <td>No face/edge detection</td>
+                </tr>
+                <tr>
+                    <td><strong>Balanced</strong></td>
+                    <td>30</td>
+                    <td>6,000</td>
+                    <td>Face + edge detection enabled</td>
+                </tr>
+                <tr>
+                    <td><strong>Portrait</strong></td>
+                    <td>50</td>
+                    <td>8,000</td>
+                    <td>Center origin, smooth skin focus</td>
+                </tr>
+                <tr>
+                    <td><strong>Photorealistic</strong></td>
+                    <td>80</td>
+                    <td>10,000</td>
+                    <td>Maximum detail</td>
+                </tr>
+                <tr>
+                    <td><strong>Experimental</strong></td>
+                    <td>100</td>
+                    <td>12,000</td>
+                    <td>All features at max settings</td>
+                </tr>
+            </table>
+        </section>
+
+        <!-- WHAT WENT WRONG -->
+        <section>
+            <h2><span class="badge badge-broken">Broken</span> What Went Wrong</h2>
+
+            <div class="alert">
+                <div class="alert-title">Complete Failure - December 2025</div>
+                <p>Every modified function performed worse than the original. Output was "unrecognizable" - messy black scribbles instead of beautiful colored trails. 128 seconds of processing produced worse results than 60 seconds with the original.</p>
+            </div>
+
+            <h3>Critical Failures (Ranked by Severity)</h3>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h4><span class="status-icon status-broken"></span> Color Distance Broken</h4>
+                    <p>LAB/weighted distance returns different scale than expected (not 0-255). Path finders make wrong decisions, resulting in random wandering.</p>
+                </div>
+                <div class="feature-card">
+                    <h4><span class="status-icon status-broken"></span> Greyscale Output</h4>
+                    <p>pathRenderer only recognizes 'color' or 'greyscale'. Setting 'weighted' or 'lab' falls through to greyscale rendering.</p>
+                </div>
+                <div class="feature-card">
+                    <h4><span class="status-icon status-broken"></span> Adaptive Sampling</h4>
+                    <p>Changing sampleSize mid-path destroys smooth tracing. Different sample counts = different arc divisions = jerky paths.</p>
+                </div>
+                <div class="feature-card">
+                    <h4><span class="status-icon status-broken"></span> Edge Bias</h4>
+                    <p>Multiplying colorDistance by edge bias corrupts the comparator logic. Path finders pick wrong pixels.</p>
+                </div>
+                <div class="feature-card">
+                    <h4><span class="status-icon status-partial"></span> Async Initialization</h4>
+                    <p>Race condition: paths might start before preprocessing completes. Silent failures possible.</p>
+                </div>
+                <div class="feature-card">
+                    <h4><span class="status-icon status-partial"></span> Gradient Cache</h4>
+                    <p>Caches by color only, ignoring position. Gradients are position-dependent, causing visual artifacts.</p>
+                </div>
+            </div>
+
+            <h3>Root Causes</h3>
+            <ul>
+                <li>Did not test original behavior before modifying</li>
+                <li>Changed core algorithms without understanding the downstream effects</li>
+                <li>"Better" color matching doesn't help if path logic is broken</li>
+                <li>Created module incompatibilities (pathFinder colorMode != pathRenderer colorMode)</li>
+                <li>Made everything async without proper error handling</li>
+                <li>Chromata's beauty comes from SIMPLE, consistent path-following</li>
+            </ul>
+        </section>
+
+        <!-- PROPOSED FIXES -->
+        <section>
+            <h2><span class="badge badge-proposed">Proposed</span> Recovery Plan</h2>
+            <p>Four-phase approach to restore functionality and properly implement enhancements.</p>
+
+            <div class="phase">
+                <div class="phase-header">
+                    <span class="phase-number">1</span>
+                    <strong>Restore Basic Functionality</strong>
+                </div>
+                <ul>
+                    <li>Change all presets to <code>colorMode: 'color'</code></li>
+                    <li>Revert <code>_getColorDistance()</code> to original single-channel method</li>
+                    <li>Remove adaptive sampling logic from pathFinder</li>
+                    <li>Remove edge bias multiplication</li>
+                    <li>Remove <code>colorMode: 'weighted'</code> default from chromata.js</li>
+                </ul>
+            </div>
+
+            <div class="phase">
+                <div class="phase-header">
+                    <span class="phase-number">2</span>
+                    <strong>Fix Rendering</strong>
+                </div>
+                <ul>
+                    <li>Fix or remove gradient caching (include position in cache key)</li>
+                    <li>Verify pathRenderer works with original logic</li>
+                    <li>Test output matches original chromata quality</li>
+                </ul>
+            </div>
+
+            <div class="phase">
+                <div class="phase-header">
+                    <span class="phase-number">3</span>
+                    <strong>Make Enhancements Optional</strong>
+                </div>
+                <ul>
+                    <li>Add explicit flags to enable/disable new color distance methods</li>
+                    <li>Make preprocessing opt-in, not default</li>
+                    <li>Ensure default behavior matches original exactly</li>
+                </ul>
+            </div>
+
+            <div class="phase">
+                <div class="phase-header">
+                    <span class="phase-number">4</span>
+                    <strong>Verify Enhancements Work</strong>
+                </div>
+                <ul>
+                    <li>Test if LAB distance actually helps (probably doesn't)</li>
+                    <li>Test if face detection adds value (probably doesn't)</li>
+                    <li>Test if edge detection improves output</li>
+                    <li>Remove what doesn't work</li>
+                </ul>
+            </div>
+
+            <div class="summary-stats">
+                <div class="stat">
+                    <div class="stat-value">~8h</div>
+                    <div class="stat-label">Estimated Fix Time</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">5</div>
+                    <div class="stat-label">Files to Revert</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">4</div>
+                    <div class="stat-label">Recovery Phases</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- KEY INSIGHT -->
+        <section>
+            <h2>Key Insight</h2>
+            <blockquote style="border-left: 4px solid var(--purple); padding-left: 1.5rem; margin: 1rem 0; color: var(--text-muted); font-style: italic;">
+                "Chromata's beauty comes from SIMPLE, fast, consistent path-following. 'Perceptual color' doesn't matter if path-finders can't follow paths. Adaptive sampling destroys the smooth curves that make it work."
+            </blockquote>
+            <p>The original algorithm works because of its elegant simplicity. Each path finder uses a single RGB channel value (<code>MAX - pixel[rgbIndex]</code>) to make consistent, predictable decisions. Complex "improvements" that break this simplicity destroy the aesthetic entirely.</p>
+        </section>
+
+        <footer>
+            <p>KJR &mdash; February 2026</p>
+            <p style="margin-top: 0.5rem;">Original Chromata by <a href="https://github.com/michaelbromley/chromata" style="color: var(--accent);">Michael Bromley</a></p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromata Reference Dashboard</title>
+    <style>
+        :root {
+            --bg-darkest: #0a0c10;
+            --bg-dark: #0d1117;
+            --bg-card: #151a22;
+            --bg-card-alt: #1a2028;
+            --bg-hover: #1e252f;
+            --border: #2a3441;
+            --border-light: #3d4a5c;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-cyan: #58d1eb;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-pink: #f778ba;
+            --accent-blue: #58a6ff;
+            --accent-red: #f85149;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-darkest);
+            color: var(--text-primary);
+            line-height: 1.5;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ========== SIDEBAR ========== */
+        .sidebar {
+            width: 220px;
+            min-width: 220px;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-logo {
+            padding: 0 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-logo h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .sidebar-logo span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .nav-section {
+            padding: 0.5rem 1rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-top: 1rem;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 0.6rem 1.25rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-left: 2px solid transparent;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            color: var(--accent-cyan);
+            border-left-color: var(--accent-cyan);
+            background: rgba(88, 209, 235, 0.08);
+        }
+
+        /* ========== MAIN CONTENT ========== */
+        .main {
+            flex: 1;
+            padding: 2rem 3rem;
+            max-width: 1200px;
+        }
+
+        /* ========== STATS BAR ========== */
+        .stats-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-chip {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .stat-chip .value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        .stat-chip .label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* ========== SEARCH ========== */
+        .search-container {
+            margin-bottom: 2rem;
+        }
+
+        .search-input {
+            width: 100%;
+            max-width: 400px;
+            padding: 0.7rem 1rem 0.7rem 2.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%236e7681' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.868-3.834zm-5.242.656a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: 0.75rem center;
+            background-size: 1rem;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent-cyan);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* ========== TAB PAGES ========== */
+        .tab-page {
+            display: none;
+        }
+
+        .tab-page.active {
+            display: block;
+        }
+
+        .section {
+            margin-bottom: 3rem;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-header h2 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .section-count {
+            background: var(--bg-card);
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ========== CLASS CARDS ========== */
+        .class-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1rem;
+        }
+
+        .class-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .class-card-header {
+            padding: 1rem 1.25rem;
+            background: var(--bg-card-alt);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .class-card-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .class-badge {
+            font-size: 0.65rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: rgba(88, 209, 235, 0.15);
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .class-card-body {
+            padding: 1rem 1.25rem;
+        }
+
+        .class-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+        }
+
+        .class-file {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: var(--bg-darkest);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        /* Collapsible methods */
+        .methods-toggle {
+            width: 100%;
+            border: none;
+            background: none;
+            cursor: pointer;
+            margin-top: 0.75rem;
+        }
+
+        .methods-toggle summary {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            padding: 0.5rem 0;
+            list-style: none;
+        }
+
+        .methods-toggle summary::-webkit-details-marker { display: none; }
+
+        .methods-toggle summary::before {
+            content: '>';
+            font-family: monospace;
+            transition: transform 0.2s;
+        }
+
+        .methods-toggle[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .methods-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+        }
+
+        .methods-table tr {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .methods-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .methods-table td {
+            padding: 0.4rem 0;
+            vertical-align: top;
+        }
+
+        .method-name {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            color: var(--accent-green);
+            white-space: nowrap;
+            padding-right: 1rem;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .method-name:hover::after {
+            content: 'Copy';
+            position: absolute;
+            right: 0.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: system-ui;
+        }
+
+        .method-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ========== CONFIG GRID ========== */
+        .config-group {
+            margin-bottom: 2rem;
+        }
+
+        .config-group-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            padding-left: 0.5rem;
+            border-left: 3px solid var(--accent-purple);
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .config-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.5rem;
+            align-items: start;
+            transition: border-color 0.15s;
+        }
+
+        .config-item:hover {
+            border-color: var(--border-light);
+        }
+
+        .config-item.custom {
+            border-left: 3px solid var(--accent-green);
+        }
+
+        .config-key {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+
+        .config-key:hover {
+            color: var(--accent-cyan);
+        }
+
+        .config-badge {
+            font-size: 0.6rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            background: var(--accent-green);
+            color: var(--bg-darkest);
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .config-desc {
+            grid-column: 1 / -1;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .config-meta {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.25rem;
+        }
+
+        .config-meta span {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        .config-meta .value {
+            color: var(--accent-orange);
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        /* ========== PRESETS ========== */
+        .presets-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .preset-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            transition: all 0.15s;
+        }
+
+        .preset-card:hover {
+            border-color: var(--accent-purple);
+            transform: translateY(-1px);
+        }
+
+        .preset-card.featured {
+            border-color: var(--accent-green);
+            background: linear-gradient(135deg, var(--bg-card) 0%, rgba(63, 185, 80, 0.08) 100%);
+        }
+
+        .preset-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .preset-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* ========== KANBAN ROADMAP ========== */
+        .kanban {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        .kanban-column {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .kanban-header {
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .kanban-header.high { color: var(--accent-orange); background: rgba(210, 153, 34, 0.1); }
+        .kanban-header.medium { color: var(--accent-blue); background: rgba(88, 166, 255, 0.1); }
+        .kanban-header.low { color: var(--text-muted); background: var(--bg-card-alt); }
+
+        .kanban-count {
+            font-size: 0.7rem;
+            background: var(--bg-darkest);
+            padding: 0.15rem 0.5rem;
+            border-radius: 10px;
+        }
+
+        .kanban-items {
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .kanban-card {
+            background: var(--bg-card-alt);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+        }
+
+        .kanban-card-title {
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+        }
+
+        .kanban-card-desc {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .kanban-card-location {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-family: 'SF Mono', Monaco, monospace;
+            margin-top: 0.5rem;
+            opacity: 0.7;
+        }
+
+        /* ========== UTILITIES ========== */
+        .hidden { display: none !important; }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--accent-green);
+            color: var(--bg-darkest);
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ========== RESPONSIVE ========== */
+        @media (max-width: 900px) {
+            .sidebar { display: none; }
+            .main { padding: 1.5rem; }
+            .kanban { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <!-- SIDEBAR -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">
+            <h1>Chromata</h1>
+            <span>Path-tracing effects library</span>
+        </div>
+        <div class="nav-section">Pages</div>
+        <a class="nav-link active" data-tab="overview">Overview</a>
+        <a class="nav-link" data-tab="api">API Reference</a>
+        <a class="nav-link" data-tab="config">Configuration</a>
+        <a class="nav-link" data-tab="presets">Presets</a>
+        <a class="nav-link" data-tab="roadmap">Roadmap</a>
+        <div class="nav-section">Resources</div>
+        <a href="index.html" class="nav-link">Live Demo</a>
+        <a href="chromata-reference.json" class="nav-link">JSON Reference</a>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+        <!-- STATS BAR -->
+        <div class="stats-bar">
+            <div class="stat-chip">
+                <span class="value">6</span>
+                <span class="label">Classes</span>
+            </div>
+            <div class="stat-chip">
+                <span class="value">34</span>
+                <span class="label">Methods</span>
+            </div>
+            <div class="stat-chip">
+                <span class="value">17</span>
+                <span class="label">Parameters</span>
+            </div>
+            <div class="stat-chip">
+                <span class="value">9</span>
+                <span class="label">Presets</span>
+            </div>
+        </div>
+
+        <!-- SEARCH -->
+        <div class="search-container">
+            <input type="text" class="search-input" id="search" placeholder="Search classes, methods, parameters...">
+        </div>
+
+        <!-- OVERVIEW TAB -->
+        <div class="tab-page active" id="overview">
+        <section class="section">
+            <div class="section-header">
+                <h2>Overview</h2>
+            </div>
+            <div class="config-item" style="max-width: 700px; margin-bottom: 1rem;">
+                <div class="config-desc" style="grid-column: 1; font-size: 0.9rem; line-height: 1.6;">
+                    <strong>Data Flow:</strong> Image loads into sourceCanvas &rarr; Optional edge detection pre-processing &rarr; Image converted to 2D pixelArray &rarr; PathFinders seeded at origin positions &rarr; Animation loop: pathfinders read pixels, calculate next position &rarr; PathRenderers draw lines/curves/dots to renderCanvas
+                </div>
+            </div>
+            <div class="config-item" style="max-width: 700px;">
+                <div class="config-desc" style="grid-column: 1; font-size: 0.9rem; line-height: 1.6;">
+                    <strong>PathFinder Algorithm:</strong> Samples arc ahead (turningAngle width, sampleSize divisions), finds pixel with best color match based on key (low=bright, high=dark), avoids visited pixels via workingArray, bounces at canvas edges.
+                </div>
+            </div>
+        </section>
+        </div>
+
+        <!-- API TAB -->
+        <div class="tab-page" id="api">
+        <section class="section">
+            <div class="section-header">
+                <h2>API Reference</h2>
+                <span class="section-count">6 classes</span>
+            </div>
+
+            <div class="class-grid">
+                <!-- Chromata -->
+                <div class="class-card" data-searchable="chromata main orchestrator start stop toggle reset">
+                    <div class="class-card-header">
+                        <h3>Chromata</h3>
+                        <span class="class-badge">Main</span>
+                    </div>
+                    <div class="class-card-body">
+                        <p class="class-desc">Core orchestrator - loads images, manages animation loop, coordinates pathfinders and renderers</p>
+                        <span class="class-file">chromata.js</span>
+                        <details class="methods-toggle">
+                            <summary>12 methods</summary>
+                            <table class="methods-table">
+                                <tr><td class="method-name" data-copy="constructor(imageElement, options)">constructor()</td><td class="method-desc">Initialize canvases, load image</td></tr>
+                                <tr><td class="method-name" data-copy="start()">start()</td><td class="method-desc">Begin animation loop</td></tr>
+                                <tr><td class="method-name" data-copy="stop()">stop()</td><td class="method-desc">Pause animation</td></tr>
+                                <tr><td class="method-name" data-copy="toggle()">toggle()</td><td class="method-desc">Start/stop toggle</td></tr>
+                                <tr><td class="method-name" data-copy="reset()">reset()</td><td class="method-desc">Clear and restart</td></tr>
+                                <tr><td class="method-name" data-copy="_mergeOptions(options)">_mergeOptions()</td><td class="method-desc">Merge config with defaults</td></tr>
+                                <tr><td class="method-name" data-copy="_run()">_run()</td><td class="method-desc">Setup and animate</td></tr>
+                                <tr><td class="method-name" data-copy="_initPathFinders()">_initPathFinders()</td><td class="method-desc">Create pathfinder array</td></tr>
+                                <tr><td class="method-name" data-copy="_seedTop()">_seedTop()</td><td class="method-desc">Spawn from top edge</td></tr>
+                                <tr><td class="method-name" data-copy="_seedBottom()">_seedBottom()</td><td class="method-desc">Spawn from bottom edge</td></tr>
+                                <tr><td class="method-name" data-copy="_seedLeft()">_seedLeft()</td><td class="method-desc">Spawn from left edge</td></tr>
+                                <tr><td class="method-name" data-copy="_seedRight()">_seedRight()</td><td class="method-desc">Spawn from right edge</td></tr>
+                            </table>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- PathFinder -->
+                <div class="class-card" data-searchable="pathfinder navigation algorithm getnextpoint velocity">
+                    <div class="class-card-header">
+                        <h3>PathFinder</h3>
+                        <span class="class-badge">Core</span>
+                    </div>
+                    <div class="class-card-body">
+                        <p class="class-desc">Navigation algorithm - determines next pixel based on color matching and direction</p>
+                        <span class="class-file">pathFinder.js</span>
+                        <details class="methods-toggle">
+                            <summary>9 methods</summary>
+                            <table class="methods-table">
+                                <tr><td class="method-name" data-copy="constructor(pixelArray, workingArray, targetColor, initX, initY, options)">constructor()</td><td class="method-desc">Init with arrays, position</td></tr>
+                                <tr><td class="method-name" data-copy="getNextPoint()">getNextPoint()</td><td class="method-desc">Main algorithm entry</td></tr>
+                                <tr><td class="method-name" data-copy="_getNextPixel()">_getNextPixel()</td><td class="method-desc">Core pathfinding logic</td></tr>
+                                <tr><td class="method-name" data-copy="getColor()">getColor()</td><td class="method-desc">Return target RGB</td></tr>
+                                <tr><td class="method-name" data-copy="_getVelocityAngle()">_getVelocityAngle()</td><td class="method-desc">Direction + edge bounce</td></tr>
+                                <tr><td class="method-name" data-copy="_getColorDistance(pixel)">_getColorDistance()</td><td class="method-desc">Pixel to target distance</td></tr>
+                                <tr><td class="method-name" data-copy="_isInRange(x, y)">_isInRange()</td><td class="method-desc">Bounds checking</td></tr>
+                                <tr><td class="method-name" data-copy="_updateWorkingArray(row, col)">_updateWorkingArray()</td><td class="method-desc">Mark visited</td></tr>
+                                <tr><td class="method-name" data-copy="_getRgbIndex(targetColorArray)">_getRgbIndex()</td><td class="method-desc">Which RGB channel</td></tr>
+                            </table>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- PathRenderer -->
+                <div class="class-card" data-searchable="pathrenderer drawing render smooth square point gradient">
+                    <div class="class-card-header">
+                        <h3>PathRenderer</h3>
+                        <span class="class-badge">Core</span>
+                    </div>
+                    <div class="class-card-body">
+                        <p class="class-desc">Drawing engine - renders paths as smooth curves, straight lines, or dots</p>
+                        <span class="class-file">pathRenderer.js</span>
+                        <details class="methods-toggle">
+                            <summary>7 methods</summary>
+                            <table class="methods-table">
+                                <tr><td class="method-name" data-copy="constructor(context, pathFinder, options)">constructor()</td><td class="method-desc">Setup context, colors</td></tr>
+                                <tr><td class="method-name" data-copy="drawNextLine()">drawNextLine()</td><td class="method-desc">Dispatch to mode</td></tr>
+                                <tr><td class="method-name" data-copy="_drawLineSmooth()">_drawLineSmooth()</td><td class="method-desc">Quadratic curves</td></tr>
+                                <tr><td class="method-name" data-copy="_drawLineSquare()">_drawLineSquare()</td><td class="method-desc">Straight segments</td></tr>
+                                <tr><td class="method-name" data-copy="_drawPoint()">_drawPoint()</td><td class="method-desc">Dot rendering</td></tr>
+                                <tr><td class="method-name" data-copy="_createGradient(p1, p2, color1, color2)">_createGradient()</td><td class="method-desc">Color transitions</td></tr>
+                                <tr><td class="method-name" data-copy="_getStrokeColor(colorValue)">_getStrokeColor()</td><td class="method-desc">RGBA string</td></tr>
+                            </table>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- PathQueue -->
+                <div class="class-card" data-searchable="pathqueue queue buffer history backtrack">
+                    <div class="class-card-header">
+                        <h3>PathQueue</h3>
+                        <span class="class-badge">Helper</span>
+                    </div>
+                    <div class="class-card-body">
+                        <p class="class-desc">Fixed-size queue for path history - enables backtracking and smooth curve control</p>
+                        <span class="class-file">pathQueue.js</span>
+                        <details class="methods-toggle">
+                            <summary>4 methods</summary>
+                            <table class="methods-table">
+                                <tr><td class="method-name" data-copy="constructor(size)">constructor()</td><td class="method-desc">Create queue with max size</td></tr>
+                                <tr><td class="method-name" data-copy="put(item)">put()</td><td class="method-desc">Add, discard oldest</td></tr>
+                                <tr><td class="method-name" data-copy="get(index)">get()</td><td class="method-desc">Retrieve by index</td></tr>
+                                <tr><td class="method-name" data-copy="contains(item)">contains()</td><td class="method-desc">Check if point exists</td></tr>
+                            </table>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Utils -->
+                <div class="class-card" data-searchable="utils static helpers imagearray workingarray dimensions">
+                    <div class="class-card-header">
+                        <h3>Utils</h3>
+                        <span class="class-badge">Static</span>
+                    </div>
+                    <div class="class-card-body">
+                        <p class="class-desc">Static helpers - image to pixel array, working array, dimensions</p>
+                        <span class="class-file">utils.js</span>
+                        <details class="methods-toggle">
+                            <summary>4 methods</summary>
+                            <table class="methods-table">
+                                <tr><td class="method-name" data-copy="_indexToRgbString(i)">_indexToRgbString()</td><td class="method-desc">Color for pathfinder</td></tr>
+                                <tr><td class="method-name" data-copy="_getImageArray(sourceContext)">_getImageArray()</td><td class="method-desc">Image to 2D pixels</td></tr>
+                                <tr><td class="method-name" data-copy="_getWorkingArray(sourceContext)">_getWorkingArray()</td><td class="method-desc">Create visit tracker</td></tr>
+                                <tr><td class="method-name" data-copy="_getOutputDimensions(image, size)">_getOutputDimensions()</td><td class="method-desc">Calculate output size</td></tr>
+                            </table>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- ImageProcessor -->
+                <div class="class-card" data-searchable="imageprocessor edge detection sobel custom">
+                    <div class="class-card-header">
+                        <h3>ImageProcessor</h3>
+                        <span class="class-badge" style="background: rgba(63, 185, 80, 0.2); color: var(--accent-green);">Custom</span>
+                    </div>
+                    <div class="class-card-body">
+                        <p class="class-desc">Edge detection and blending for sketch effects</p>
+                        <span class="class-file">chromata-custom.js</span>
+                        <details class="methods-toggle">
+                            <summary>2 methods</summary>
+                            <table class="methods-table">
+                                <tr><td class="method-name" data-copy="detectEdges(sourceContext, strength)">detectEdges()</td><td class="method-desc">Sobel edge detection</td></tr>
+                                <tr><td class="method-name" data-copy="blendEdges(sourceContext, originalData, edgeMix)">blendEdges()</td><td class="method-desc">Blend edges with original</td></tr>
+                            </table>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </section>
+        </div>
+
+        <!-- CONFIGURATION TAB -->
+        <div class="tab-page" id="config">
+        <section class="section">
+            <div class="section-header">
+                <h2>Configuration</h2>
+                <span class="section-count">17 parameters</span>
+            </div>
+
+            <!-- Movement & Physics -->
+            <div class="config-group">
+                <h3 class="config-group-title">Movement & Physics</h3>
+                <div class="config-grid">
+                    <div class="config-item" data-searchable="speed pixels step distance">
+                        <span class="config-key" data-copy="speed: 7">speed</span>
+                        <div class="config-desc">Pixels traveled per step - affects tracing accuracy and visual rate</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">1-100</span></span>
+                            <span>Default: <span class="value">7</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item custom" data-searchable="stepsperframe visual speed decouple accuracy">
+                        <span class="config-key" data-copy="stepsPerFrame: 1">stepsPerFrame</span>
+                        <span class="config-badge">NEW</span>
+                        <div class="config-desc">Decouples visual speed from accuracy. Steps per animation frame.</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">1-20</span></span>
+                            <span>Default: <span class="value">1</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item" data-searchable="turningangle arc direction radians">
+                        <span class="config-key" data-copy="turningAngle: Math.PI">turningAngle</span>
+                        <div class="config-desc">Arc width for direction sampling in radians</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">0.1-10</span></span>
+                            <span>Default: <span class="value">Math.PI</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item custom" data-searchable="samplesize directions precision angular">
+                        <span class="config-key" data-copy="sampleSize: 16">sampleSize</span>
+                        <span class="config-badge">NEW</span>
+                        <div class="config-desc">Directions tested within arc. Higher = smoother, lower = angular</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">2-32</span></span>
+                            <span>Default: <span class="value">16</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item custom" data-searchable="jitter wobble hand-drawn sketchy random">
+                        <span class="config-key" data-copy="jitter: 0">jitter</span>
+                        <span class="config-badge">NEW</span>
+                        <div class="config-desc">Random wobble for hand-drawn feel. Applied as angle offset.</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">0-2</span></span>
+                            <span>Default: <span class="value">0</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item" data-searchable="pathfindercount tracers density">
+                        <span class="config-key" data-copy="pathFinderCount: 30">pathFinderCount</span>
+                        <div class="config-desc">Number of simultaneous path tracers</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">1-10000</span></span>
+                            <span>Default: <span class="value">30</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rendering & Style -->
+            <div class="config-group">
+                <h3 class="config-group-title">Rendering & Style</h3>
+                <div class="config-grid">
+                    <div class="config-item" data-searchable="colormode color greyscale monochrome">
+                        <span class="config-key" data-copy="colorMode: 'color'">colorMode</span>
+                        <div class="config-desc">RGB color cycling or monochrome output</div>
+                        <div class="config-meta">
+                            <span>Values: <span class="value">'color' | 'greyscale'</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item" data-searchable="compositeoperation blend lighten darken">
+                        <span class="config-key" data-copy="compositeOperation: 'lighten'">compositeOperation</span>
+                        <div class="config-desc">Canvas blend mode for drawing</div>
+                        <div class="config-meta">
+                            <span>Values: <span class="value">lighten, darken, source-over, difference, screen</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item" data-searchable="linemode smooth square point dots curves">
+                        <span class="config-key" data-copy="lineMode: 'smooth'">lineMode</span>
+                        <div class="config-desc">smooth = curves, square = lines, point = dots</div>
+                        <div class="config-meta">
+                            <span>Values: <span class="value">'smooth' | 'square' | 'point'</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item" data-searchable="linewidth stroke thickness">
+                        <span class="config-key" data-copy="lineWidth: 2">lineWidth</span>
+                        <div class="config-desc">Stroke thickness in pixels</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">1-100</span></span>
+                            <span>Default: <span class="value">2</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item custom" data-searchable="lineopacity transparency alpha">
+                        <span class="config-key" data-copy="lineOpacity: 1">lineOpacity</span>
+                        <span class="config-badge">NEW</span>
+                        <div class="config-desc">Line transparency for layered/soft effects</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">0-1</span></span>
+                            <span>Default: <span class="value">1</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item" data-searchable="key low high bright dark seek">
+                        <span class="config-key" data-copy="key: 'low'">key</span>
+                        <div class="config-desc">low = seek bright pixels, high = seek dark</div>
+                        <div class="config-meta">
+                            <span>Values: <span class="value">'low' | 'high'</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Image Processing -->
+            <div class="config-group">
+                <h3 class="config-group-title">Image Processing</h3>
+                <div class="config-grid">
+                    <div class="config-item custom" data-searchable="edgedetect sobel contours sketch">
+                        <span class="config-key" data-copy="edgeDetect: 0">edgeDetect</span>
+                        <span class="config-badge">NEW</span>
+                        <div class="config-desc">Sobel edge detection mix. 0=original, 1=pure edges. Critical for sketch.</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">0-1</span></span>
+                            <span>Default: <span class="value">0</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item custom" data-searchable="edgestrength intensity bold">
+                        <span class="config-key" data-copy="edgeStrength: 1">edgeStrength</span>
+                        <span class="config-badge">NEW</span>
+                        <div class="config-desc">Edge detection intensity multiplier</div>
+                        <div class="config-meta">
+                            <span>Range: <span class="value">0.5-3</span></span>
+                            <span>Default: <span class="value">1</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Initialization -->
+            <div class="config-group">
+                <h3 class="config-group-title">Initialization</h3>
+                <div class="config-grid">
+                    <div class="config-item" data-searchable="origin spawn top bottom left right">
+                        <span class="config-key" data-copy="origin: ['bottom']">origin</span>
+                        <div class="config-desc">Where pathfinders spawn from</div>
+                        <div class="config-meta">
+                            <span>Values: <span class="value">['top', 'bottom', 'left', 'right', 'X% Y%']</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item" data-searchable="outputsize original container dimensions">
+                        <span class="config-key" data-copy="outputSize: 'original'">outputSize</span>
+                        <div class="config-desc">Use original image size or fit to container</div>
+                        <div class="config-meta">
+                            <span>Values: <span class="value">'original' | 'container'</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item" data-searchable="iterationlimit stop frames">
+                        <span class="config-key" data-copy="iterationLimit: 0">iterationLimit</span>
+                        <div class="config-desc">Stop after N iterations (0 = unlimited)</div>
+                        <div class="config-meta">
+                            <span>Default: <span class="value">0</span></span>
+                        </div>
+                    </div>
+                    <div class="config-item custom" data-searchable="pathmemory queue backtrack history">
+                        <span class="config-key" data-copy="pathMemory: 10">pathMemory</span>
+                        <span class="config-badge">NEW</span>
+                        <div class="config-desc">PathQueue size - points remembered for backtracking</div>
+                        <div class="config-meta">
+                            <span>Default: <span class="value">10</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        </div>
+
+        <!-- PRESETS TAB -->
+        <div class="tab-page" id="presets">
+        <section class="section">
+            <div class="section-header">
+                <h2>Presets</h2>
+                <span class="section-count">9 presets</span>
+            </div>
+
+            <div class="presets-grid">
+                <div class="preset-card" data-searchable="fractal organic branching default">
+                    <div class="preset-name">fractal</div>
+                    <div class="preset-desc">Default organic branching pattern</div>
+                </div>
+                <div class="preset-card" data-searchable="lines vertical edge">
+                    <div class="preset-name">lines</div>
+                    <div class="preset-desc">Vertical lines from edges</div>
+                </div>
+                <div class="preset-card" data-searchable="impressionism pointillist dots">
+                    <div class="preset-name">impressionism</div>
+                    <div class="preset-desc">Pointillist dots from all directions</div>
+                </div>
+                <div class="preset-card" data-searchable="geometry angular geometric">
+                    <div class="preset-name">geometry</div>
+                    <div class="preset-desc">Angular geometric patterns</div>
+                </div>
+                <div class="preset-card" data-searchable="halftone greyscale dot pattern">
+                    <div class="preset-name">halftone</div>
+                    <div class="preset-desc">Greyscale dot pattern from sides</div>
+                </div>
+                <div class="preset-card" data-searchable="neon bright flowing glow">
+                    <div class="preset-name">neon</div>
+                    <div class="preset-desc">Bright flowing neon lines</div>
+                </div>
+                <div class="preset-card" data-searchable="pixel chunky retro 8bit">
+                    <div class="preset-name">pixel</div>
+                    <div class="preset-desc">Chunky pixel-art style</div>
+                </div>
+                <div class="preset-card" data-searchable="sketch greyscale darken">
+                    <div class="preset-name">sketch</div>
+                    <div class="preset-desc">Original sketch preset</div>
+                </div>
+                <div class="preset-card featured" data-searchable="pencil-sketch jitter edge detection recommended">
+                    <div class="preset-name">pencil-sketch-recommended</div>
+                    <div class="preset-desc">Optimized with jitter + edge detection</div>
+                </div>
+            </div>
+        </section>
+        </div>
+
+        <!-- ROADMAP TAB -->
+        <div class="tab-page" id="roadmap">
+        <section class="section">
+            <div class="section-header">
+                <h2>Roadmap</h2>
+                <span class="section-count">8 ideas</span>
+            </div>
+
+            <div class="kanban">
+                <!-- High Priority -->
+                <div class="kanban-column">
+                    <div class="kanban-header high">
+                        High Priority
+                        <span class="kanban-count">3</span>
+                    </div>
+                    <div class="kanban-items">
+                        <div class="kanban-card" data-searchable="line pressure taper brush pen">
+                            <div class="kanban-card-title">Line Pressure/Taper</div>
+                            <div class="kanban-card-desc">Vary line width along path for natural brush/pen feel</div>
+                            <div class="kanban-card-location">PathRenderer</div>
+                        </div>
+                        <div class="kanban-card" data-searchable="paper texture overlay grain">
+                            <div class="kanban-card-title">Paper Texture Overlay</div>
+                            <div class="kanban-card-desc">Optional grain layer for authentic paper feel</div>
+                            <div class="kanban-card-location">Post-processing</div>
+                        </div>
+                        <div class="kanban-card" data-searchable="export download save png jpg">
+                            <div class="kanban-card-title">Export/Download</div>
+                            <div class="kanban-card-desc">Save rendered canvas as PNG/JPG</div>
+                            <div class="kanban-card-location">canvas.toDataURL()</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medium Priority -->
+                <div class="kanban-column">
+                    <div class="kanban-header medium">
+                        Medium Priority
+                        <span class="kanban-count">3</span>
+                    </div>
+                    <div class="kanban-items">
+                        <div class="kanban-card" data-searchable="canny edge detection gaussian">
+                            <div class="kanban-card-title">Canny Edge Detection</div>
+                            <div class="kanban-card-desc">More sophisticated than Sobel with hysteresis thresholding</div>
+                            <div class="kanban-card-location">ImageProcessor</div>
+                        </div>
+                        <div class="kanban-card" data-searchable="multi-pass rendering layers">
+                            <div class="kanban-card-title">Multi-Pass Rendering</div>
+                            <div class="kanban-card-desc">Multiple passes with different settings for layered effects</div>
+                            <div class="kanban-card-location">Chromata orchestration</div>
+                        </div>
+                        <div class="kanban-card" data-searchable="custom origin patterns spiral grid radial">
+                            <div class="kanban-card-title">Custom Origin Patterns</div>
+                            <div class="kanban-card-desc">Spiral, grid, radial burst seed patterns</div>
+                            <div class="kanban-card-location">_initPathFinders()</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Low Priority -->
+                <div class="kanban-column">
+                    <div class="kanban-header low">
+                        Low Priority
+                        <span class="kanban-count">2</span>
+                    </div>
+                    <div class="kanban-items">
+                        <div class="kanban-card" data-searchable="animation recording video gif capture">
+                            <div class="kanban-card-title">Animation Recording</div>
+                            <div class="kanban-card-desc">Capture render progress as video/GIF</div>
+                            <div class="kanban-card-location">MediaRecorder API</div>
+                        </div>
+                        <div class="kanban-card" data-searchable="color palette extraction dominant kmeans">
+                            <div class="kanban-card-title">Color Palette Extraction</div>
+                            <div class="kanban-card-desc">Auto-extract dominant colors for pathfinder targets</div>
+                            <div class="kanban-card-location">Utils extension</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        </div>
+
+        <!-- Footer -->
+        <footer style="text-align: center; padding: 2rem 0; color: var(--text-muted); font-size: 0.8rem; border-top: 1px solid var(--border); margin-top: 2rem;">
+            Chromata Dashboard v3 (Tabbed) | kjr | 2026-02-11 | Original library by Michael Bromley
+        </footer>
+    </main>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast">Copied!</div>
+
+    <script>
+        // ========== SEARCH FILTER ==========
+        const searchInput = document.getElementById('search');
+        const searchableElements = document.querySelectorAll('[data-searchable]');
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const activeTab = document.querySelector('.tab-page.active');
+
+            searchableElements.forEach(el => {
+                // Only filter items in the active tab
+                if (!activeTab || !activeTab.contains(el)) return;
+
+                const searchText = el.dataset.searchable + ' ' + el.textContent.toLowerCase();
+                const matches = query === '' || searchText.includes(query);
+
+                // Find the closest card/item container
+                const container = el.closest('.class-card, .config-item, .preset-card, .kanban-card');
+                if (container) {
+                    container.classList.toggle('hidden', !matches);
+                }
+            });
+        });
+
+        // ========== COPY FUNCTIONALITY ==========
+        const toast = document.getElementById('toast');
+
+        function showToast(message = 'Copied!') {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 1500);
+        }
+
+        // Copy method names
+        document.querySelectorAll('.method-name[data-copy]').forEach(el => {
+            el.addEventListener('click', () => {
+                navigator.clipboard.writeText(el.dataset.copy);
+                showToast('Copied: ' + el.dataset.copy);
+            });
+        });
+
+        // Copy config keys
+        document.querySelectorAll('.config-key[data-copy]').forEach(el => {
+            el.addEventListener('click', () => {
+                navigator.clipboard.writeText(el.dataset.copy);
+                showToast('Copied: ' + el.dataset.copy);
+            });
+        });
+
+        // ========== TAB SWITCHING ==========
+        const tabLinks = document.querySelectorAll('.nav-link[data-tab]');
+        const tabPages = document.querySelectorAll('.tab-page');
+
+        tabLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                const tabId = link.dataset.tab;
+
+                // Update nav active state
+                tabLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+
+                // Show/hide tab pages
+                tabPages.forEach(page => {
+                    page.classList.toggle('active', page.id === tabId);
+                });
+
+                // Clear search when switching tabs
+                searchInput.value = '';
+                searchableElements.forEach(el => {
+                    const container = el.closest('.class-card, .config-item, .preset-card, .kanban-card');
+                    if (container) container.classList.remove('hidden');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

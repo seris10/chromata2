@@ -1,0 +1,2499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromata</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 10px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .layout {
+            display: flex;
+            gap: 10px;
+            height: 100%;
+        }
+        .controls {
+            width: 320px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            height: calc(100vh - 20px);
+        }
+        .canvas-container {
+            flex: 1;
+            background: #000;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .canvas-container canvas, .canvas-container img {
+            max-width: 100%;
+            max-height: calc(100vh - 20px);
+            display: block;
+        }
+        .hidden { display: none !important; }
+        #faceOverlayCanvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .img-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .drop-zone {
+            border: 2px dashed #555;
+            border-radius: 4px;
+            padding: 14px 8px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 11px;
+            margin-bottom: 6px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #4a9eff;
+            background: rgba(74, 158, 255, 0.08);
+        }
+        .drop-zone p { margin: 0; color: #888; }
+        .tp-dfwv { width: 100% !important; }
+        /* Tooltips */
+        .tooltips-on [data-tip] {
+            position: relative;
+        }
+        .tooltips-on [data-tip]:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            left: 0;
+            top: 100%;
+            z-index: 1000;
+            background: #000e;
+            color: #ccc;
+            font-size: 11px;
+            line-height: 1.35;
+            padding: 6px 8px;
+            border-radius: 4px;
+            width: 280px;
+            white-space: normal;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div class="controls" id="controlsPanel">
+            <div class="drop-zone" id="dropZone">
+                <p>Drop image or click to select</p>
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            </div>
+            <div id="tweakpane-container"></div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+            <div class="img-wrapper" id="imgWrapper">
+                <img id="sourceImage" class="hidden" crossorigin="anonymous">
+                <canvas id="faceOverlayCanvas" class="hidden"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4/dist/tf.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow-models/deeplab@0.2/dist/deeplab.js"></script>
+    <script src="chromata-custom.js"></script>
+    <script type="module">
+        import * as Tweakpane from 'https://cdn.jsdelivr.net/npm/tweakpane@4/dist/tweakpane.min.js';
+        // ============ STATE ============
+        let chromata = null;
+        let isRunning = false;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let faceApiReady = false;
+        let detectedFaces = [];
+        const faceOverlayCanvas = document.getElementById('faceOverlayCanvas');
+        const faceOverlayCtx = faceOverlayCanvas.getContext('2d');
+
+        // ============ PARAMS (Tweakpane binds to this) ============
+        const PARAMS = {
+            colorMode: 'color',
+            compositeOperation: 'lighten',
+            key: 'low',
+            lineMode: 'smooth',
+            lineWidth: 2,
+            lineOpacity: 100,
+            pixelSize: 8,
+            outputSize: 'container',
+            pathFinderCount: 27,
+            speed: 8,
+            turningAngle: 1.0,
+            sampleSize: 16,
+            jitter: 0,
+            edgeDetect: 0,
+            alphaThreshold: 255,
+            iterationLimit: 0,
+            stepsPerFrame: 1,
+            seed: '',
+            backgroundColor: '#000000',
+            backgroundAlpha: 0,
+            originBottom: true,
+            originTop: false,
+            originLeft: false,
+            originRight: false,
+            customOrigin: '',
+            radialEnabled: false,
+            radialStrength: 50,
+            radialRadius: 40,
+            radialCW: 50,
+            radialPercent: 100,
+            radialCenterX: 50,
+            radialCenterY: 50,
+            radialDrift: 0,
+            radialDriftSpread: 100,
+            radialOnConverge: 'stick',
+            radialMinRadius: 5,
+            faceGravity: 10,
+            focusEnabled: false,
+            focusX: 50,
+            focusY: 40,
+            focusWidth: 30,
+            focusHeight: 30,
+            focusPercent: 50,
+            forceNodes: [],
+            // Force node placement/arrangement state
+            placeMode: null,  // null or type string when placing
+            arrangeCount: 6,
+            arrangePattern: 'ring',
+            arrangeType: 'gravity',
+            arrangeRadius: 30,
+            // Natural math modes
+            mathMode: 'none',
+            mathStrength: 50,
+            mathCenterX: 50,
+            mathCenterY: 50,
+            mathCurvatureRate: 30,
+            mathCurvatureMax: 50,
+            mathFreqX: 3,
+            mathFreqY: 2,
+            mathLissRate: 50,
+            mathLorenzChaos: 28,
+            mathLorenzDt: 50,
+            mathFlowScale: 30,
+            mathFlowEvolution: 0,
+            mathFlowOctaves: 1,
+            mathSeparation: 70,
+            mathAlignment: 50,
+            mathCohesion: 30,
+            mathPerception: 50,
+            mathBranchInterval: 60,
+            mathBranchAngle: 25,
+            mathGenerations: 4,
+            // Audio input
+            audioEnabled: false,
+            audioGain: 100,
+            audioColorMap: 'frequency',
+            audioSmoothing: 70,
+            audioFftSize: 2048,
+            audioRefreshRate: 4,
+            audioLogScale: true,
+            audioShowSpectrogram: false,
+            audioSource: 'mic'
+        };
+
+        const MONITOR = { fps: 0, iterations: 0, pathfinders: 0, coverage: 0, status: 'Load an image' };
+
+        // ============ PARAMETER RANGES (per-pathfinder variation) ============
+        const RANGES = {
+            speed:         { enabled: false, min: 1,   max: 50  },
+            lineWidth:     { enabled: false, min: 0.5, max: 20  },
+            turningAngle:  { enabled: false, min: 0.1, max: 2   },
+            jitter:        { enabled: false, min: 0,   max: 100 },
+            lineOpacity:   { enabled: false, min: 1,   max: 100 },
+            sampleSize:    { enabled: false, min: 2,   max: 32  },
+            radialStrength:{ enabled: false, min: 0,   max: 100 },
+            radialRadius:  { enabled: false, min: 1,   max: 100 }
+        };
+
+        // ============ MODULATORS (oscillator system) ============
+        var MODULATORS = [];  // max 8
+        var modRAF = null;
+
+        function oscillate(waveform, t) {
+            switch (waveform) {
+                case 'sine':     return (Math.sin(t * Math.PI * 2) + 1) / 2;
+                case 'triangle': return t < 0.5 ? t * 2 : 2 - t * 2;
+                case 'sawtooth': return t;
+                case 'square':   return t < 0.5 ? 1 : 0;
+                case 'random':   return Math.random();
+                default:         return 0.5;
+            }
+        }
+
+        function applyModTransform(param, v) {
+            switch (param) {
+                case 'turningAngle': return v * Math.PI;
+                case 'lineOpacity':  return v / 100;
+                case 'jitter':       return v / 50;
+                case 'radialStrength': return v / 100;
+                case 'mathStrength': return v;
+                default:             return v;
+            }
+        }
+
+        function tickModulation() {
+            if (!chromata || !chromata.isRunning || MODULATORS.length === 0) {
+                modRAF = requestAnimationFrame(tickModulation);
+                return;
+            }
+            var iter = chromata.iterationCount;
+            var updates = {};
+            var anyUpdate = false;
+            MODULATORS.forEach(function(m) {
+                if (!m.enabled) return;
+                var t = ((iter / m.period) + m.phase) % 1;
+                var v = m.min + oscillate(m.waveform, t) * (m.max - m.min);
+                updates[m.param] = applyModTransform(m.param, v);
+                anyUpdate = true;
+            });
+            if (anyUpdate) chromata.updateOptions(updates);
+            modRAF = requestAnimationFrame(tickModulation);
+        }
+        modRAF = requestAnimationFrame(tickModulation);
+
+        // ============ REGION DETECTION (DeepLab v3) ============
+        const REGION_GROUPS = {
+            sky:        [2],
+            water:      [22, 61, 110, 129, 148],
+            vegetation: [5, 18, 10, 67, 73],
+            rock:       [35, 70, 91, 47],
+            building:   [1, 26, 43, 33, 62],
+            person:     [13],
+            road:       [7, 12, 53],
+            other:      []
+        };
+        var REGION_GROUP_NAMES = Object.keys(REGION_GROUPS);
+        var regionModel = null;
+        var regionMask = null;  // Uint8Array(w*h), values 0-7 = group index
+        var regionStats = {};   // { groupName: percentage }
+        var regionProfilesEnabled = false;
+        var regionProfiles = {}; // { groupIndex: { speed, lineWidth, jitter, turningAngle, lineOpacity } }
+
+        function classIdToGroupIndex(classId) {
+            for (var gi = 0; gi < REGION_GROUP_NAMES.length - 1; gi++) {
+                var group = REGION_GROUPS[REGION_GROUP_NAMES[gi]];
+                if (group.indexOf(classId) !== -1) return gi;
+            }
+            return REGION_GROUP_NAMES.length - 1; // 'other'
+        }
+
+        async function loadRegionModel() {
+            if (regionModel) return regionModel;
+            // Wait for deeplab to be available
+            var attempts = 0;
+            while (typeof deeplab === 'undefined' && attempts < 50) {
+                await new Promise(function(r) { setTimeout(r, 200); });
+                attempts++;
+            }
+            if (typeof deeplab === 'undefined') {
+                throw new Error('DeepLab failed to load');
+            }
+            MONITOR.status = 'Loading DeepLab model...';
+            regionModel = await deeplab.load({ base: 'ade20k', quantizationBytes: 2 });
+            return regionModel;
+        }
+
+        async function detectRegions() {
+            if (!sourceImage.naturalWidth || sourceImage.classList.contains('hidden')) {
+                MONITOR.status = 'Load an image first';
+                return;
+            }
+            if (sourceImage.naturalWidth < 128 || sourceImage.naturalHeight < 128) {
+                MONITOR.status = 'Image too small for region detection';
+                return;
+            }
+            try {
+                var model = await loadRegionModel();
+                MONITOR.status = 'Detecting regions...';
+
+                // Run segmentation on source image
+                var result = await model.segment(sourceImage);
+                var segMap = result.segmentationMap; // Uint8Array at model resolution
+
+                // Get target dimensions (match what chromata will use)
+                var targetW = sourceImage.naturalWidth;
+                var targetH = sourceImage.naturalHeight;
+
+                // Nearest-neighbor resize from model output to target dimensions
+                var modelW = result.width || Math.round(Math.sqrt(segMap.length * (sourceImage.naturalWidth / sourceImage.naturalHeight)));
+                var modelH = result.height || Math.round(segMap.length / modelW);
+
+                regionMask = new Uint8Array(targetW * targetH);
+                var counts = new Int32Array(REGION_GROUP_NAMES.length);
+                var total = targetW * targetH;
+
+                for (var y = 0; y < targetH; y++) {
+                    for (var x = 0; x < targetW; x++) {
+                        var srcX = Math.floor(x * modelW / targetW);
+                        var srcY = Math.floor(y * modelH / targetH);
+                        var classId = segMap[srcY * modelW + srcX];
+                        var groupIdx = classIdToGroupIndex(classId);
+                        regionMask[y * targetW + x] = groupIdx;
+                        counts[groupIdx]++;
+                    }
+                }
+
+                // Compute stats
+                regionStats = {};
+                var detectedGroups = [];
+                for (var gi = 0; gi < REGION_GROUP_NAMES.length; gi++) {
+                    var pct = Math.round(counts[gi] / total * 100);
+                    if (pct > 0) {
+                        regionStats[REGION_GROUP_NAMES[gi]] = pct;
+                        detectedGroups.push(REGION_GROUP_NAMES[gi] + ' ' + pct + '%');
+                    }
+                }
+                REGION_MONITOR.detected = detectedGroups.join(', ') || 'None';
+                MONITOR.status = 'Regions detected: ' + detectedGroups.length + ' types';
+                rebuildRegionProfileUI();
+            } catch (err) {
+                console.error('Region detection error:', err);
+                MONITOR.status = 'Region detection failed: ' + err.message;
+            }
+        }
+
+        // ============ AUDIO INPUT SYSTEM ============
+        var audioCtx = null;
+        var audioAnalyser = null;
+        var audioStream = null;
+        var audioSourceNode = null;
+        var audioOffscreen = null;
+        var audioOffCtx = null;
+        var audioFreqData = null;
+        var audioRAF = null;
+        var audioFrameCount = 0;
+        var audioColumnX = 0;
+        var audioGainNode = null;
+        var audioFileElement = null;
+        var originalPixelDataCopy = null;
+
+        function freqHueMap(binNorm, amplitude) {
+            var h = binNorm * 270;
+            var s = 1;
+            var v = amplitude / 255;
+            var c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+            var r = 0, g = 0, b = 0;
+            if (h < 60) { r = c; g = x; }
+            else if (h < 120) { r = x; g = c; }
+            else if (h < 180) { g = c; b = x; }
+            else if (h < 240) { g = x; b = c; }
+            else { r = x; b = c; }
+            return [(r + m) * 255 | 0, (g + m) * 255 | 0, (b + m) * 255 | 0];
+        }
+
+        function grayscaleMap(binNorm, amplitude) {
+            return [amplitude, amplitude, amplitude];
+        }
+
+        function heatMap(binNorm, amplitude) {
+            var t = amplitude / 255;
+            var r, g, b;
+            if (t < 0.2) { r = 0; g = 0; b = t * 5 * 180; }
+            else if (t < 0.4) { var u = (t - 0.2) * 5; r = 0; g = u * 200; b = 180 - u * 80; }
+            else if (t < 0.6) { var u = (t - 0.4) * 5; r = u * 255; g = 200 + u * 55; b = 100 - u * 100; }
+            else if (t < 0.8) { var u = (t - 0.6) * 5; r = 255; g = 255 - u * 155; b = 0; }
+            else { var u = (t - 0.8) * 5; r = 255; g = 100 + u * 155; b = u * 255; }
+            return [r | 0, g | 0, b | 0];
+        }
+
+        function getColorMapFn() {
+            switch (PARAMS.audioColorMap) {
+                case 'grayscale': return grayscaleMap;
+                case 'heat': return heatMap;
+                default: return freqHueMap;
+            }
+        }
+
+        async function initAudio() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                }
+
+                audioAnalyser = audioCtx.createAnalyser();
+                audioAnalyser.fftSize = PARAMS.audioFftSize;
+                audioAnalyser.smoothingTimeConstant = PARAMS.audioSmoothing / 100;
+
+                audioGainNode = audioCtx.createGain();
+                audioGainNode.gain.value = PARAMS.audioGain / 100;
+                audioGainNode.connect(audioAnalyser);
+
+                if (PARAMS.audioSource === 'mic') {
+                    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    audioSourceNode = audioCtx.createMediaStreamSource(audioStream);
+                    audioSourceNode.connect(audioGainNode);
+                } else if (PARAMS.audioSource === 'file' && audioFileElement) {
+                    if (!audioFileElement._sourceNode) {
+                        audioFileElement._sourceNode = audioCtx.createMediaElementSource(audioFileElement);
+                    }
+                    audioSourceNode = audioFileElement._sourceNode;
+                    audioSourceNode.connect(audioGainNode);
+                    audioSourceNode.connect(audioCtx.destination);
+                    audioFileElement.play();
+                }
+
+                audioFreqData = new Uint8Array(audioAnalyser.frequencyBinCount);
+
+                // Create offscreen canvas matching Chromata dimensions or default 800x600
+                var w = 800, h = 600;
+                if (chromata && chromata.dimensions) {
+                    w = chromata.dimensions.width;
+                    h = chromata.dimensions.height;
+                } else if (sourceImage.naturalWidth) {
+                    w = sourceImage.naturalWidth;
+                    h = sourceImage.naturalHeight;
+                }
+                audioOffscreen = document.createElement('canvas');
+                audioOffscreen.width = w;
+                audioOffscreen.height = h;
+                audioOffCtx = audioOffscreen.getContext('2d');
+                audioOffCtx.fillStyle = '#000';
+                audioOffCtx.fillRect(0, 0, w, h);
+                audioColumnX = 0;
+                audioFrameCount = 0;
+
+                // Save original pixelData so we can restore on disable
+                if (chromata && chromata.pixelData) {
+                    originalPixelDataCopy = new Uint8Array(chromata.pixelData);
+                }
+
+                // Start audio render loop
+                audioTick();
+                MONITOR.status = 'Audio: ' + PARAMS.audioSource + ' active';
+            } catch (err) {
+                console.error('Audio init failed:', err);
+                PARAMS.audioEnabled = false;
+                pane.refresh();
+                MONITOR.status = 'Audio failed: ' + (err.name === 'NotAllowedError' ? 'mic permission denied' : err.message);
+            }
+        }
+
+        function stopAudio() {
+            if (audioRAF) { cancelAnimationFrame(audioRAF); audioRAF = null; }
+            if (audioSourceNode) {
+                try { audioSourceNode.disconnect(); } catch (e) {}
+                audioSourceNode = null;
+            }
+            if (audioStream) {
+                audioStream.getTracks().forEach(function(t) { t.stop(); });
+                audioStream = null;
+            }
+            if (audioGainNode) {
+                try { audioGainNode.disconnect(); } catch (e) {}
+                audioGainNode = null;
+            }
+            audioAnalyser = null;
+            audioFreqData = null;
+            audioOffscreen = null;
+            audioOffCtx = null;
+            audioFrameCount = 0;
+            audioColumnX = 0;
+
+            // Restore original pixel data
+            if (originalPixelDataCopy && chromata && chromata.pixelData) {
+                chromata.pixelData.set(originalPixelDataCopy);
+                originalPixelDataCopy = null;
+            }
+            MONITOR.status = 'Audio stopped';
+        }
+
+        function renderSpectrogramColumn(freqData) {
+            var canvas = audioOffscreen;
+            var ctx = audioOffCtx;
+            var w = canvas.width;
+            var h = canvas.height;
+            var binCount = freqData.length;
+            var colorFn = getColorMapFn();
+            var gain = PARAMS.audioGain / 100;
+
+            // Scroll left: copy existing content shifted 1px left
+            ctx.drawImage(canvas, 1, 0, w - 1, h, 0, 0, w - 1, h);
+            // Clear rightmost column
+            ctx.fillStyle = '#000';
+            ctx.fillRect(w - 1, 0, 1, h);
+
+            var imgData = ctx.createImageData(1, h);
+            var data = imgData.data;
+
+            for (var py = 0; py < h; py++) {
+                // Y=0 is top of canvas = highest frequency, Y=h-1 = bottom = lowest
+                var freqNorm;
+                if (PARAMS.audioLogScale) {
+                    // Log scale: spread bass across more pixels
+                    var linNorm = 1 - py / h; // 0=bottom(bass), 1=top(treble)
+                    // Map log: exp curve so bass gets more pixel space
+                    freqNorm = Math.pow(linNorm, 2.5);
+                } else {
+                    freqNorm = 1 - py / h;
+                }
+                var bin = Math.floor(freqNorm * (binCount - 1));
+                bin = Math.max(0, Math.min(binCount - 1, bin));
+                var amp = Math.min(255, freqData[bin] * gain);
+                var rgb = colorFn(bin / binCount, amp);
+                var idx = py * 4;
+                data[idx] = rgb[0];
+                data[idx + 1] = rgb[1];
+                data[idx + 2] = rgb[2];
+                data[idx + 3] = 255;
+            }
+            ctx.putImageData(imgData, w - 1, 0);
+        }
+
+        function audioTick() {
+            if (!PARAMS.audioEnabled || !audioAnalyser) return;
+            audioRAF = requestAnimationFrame(audioTick);
+            audioFrameCount++;
+
+            audioAnalyser.getByteFrequencyData(audioFreqData);
+            renderSpectrogramColumn(audioFreqData);
+
+            // Show spectrogram overlay if enabled
+            if (PARAMS.audioShowSpectrogram) {
+                var specCanvas = document.getElementById('spectrogramCanvas');
+                if (specCanvas) {
+                    var sctx = specCanvas.getContext('2d');
+                    specCanvas.width = audioOffscreen.width;
+                    specCanvas.height = audioOffscreen.height;
+                    sctx.drawImage(audioOffscreen, 0, 0);
+                }
+            }
+
+            // Update Chromata pixelData every N frames
+            if (audioFrameCount % PARAMS.audioRefreshRate === 0 && chromata && chromata.pixelData) {
+                var imgData = audioOffCtx.getImageData(0, 0, audioOffscreen.width, audioOffscreen.height);
+                chromata.updatePixelData(imgData);
+                // Clear rightmost columns of workingData for fresh territory
+                var clearWidth = Math.max(2, Math.ceil(PARAMS.audioRefreshRate * 1.5));
+                var rightEdge = audioOffscreen.width;
+                chromata.clearWorkingColumns(rightEdge - clearWidth, rightEdge);
+            }
+        }
+
+        // ============ PRESETS ============
+        const presets = {
+            fractal: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'smooth', lineWidth: 2, pathFinderCount: 27,
+                speed: 8, turningAngle: 1, origin: ['bottom']
+            },
+            lines: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'square', lineWidth: 1, pathFinderCount: 50,
+                speed: 5, turningAngle: 0.5, origin: ['bottom', 'top']
+            },
+            impressionism: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'point', lineWidth: 4, pathFinderCount: 100,
+                speed: 3, turningAngle: 2, origin: ['bottom', 'top', 'left', 'right']
+            },
+            geometry: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'high',
+                lineMode: 'square', lineWidth: 2, pathFinderCount: 20,
+                speed: 10, turningAngle: 0.5, origin: ['bottom']
+            },
+            halftone: {
+                colorMode: 'greyscale', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'point', lineWidth: 3, pathFinderCount: 80,
+                speed: 4, turningAngle: 1.5, origin: ['left', 'right']
+            },
+            neon: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'smooth', lineWidth: 3, pathFinderCount: 40,
+                speed: 12, turningAngle: 0.8, origin: ['bottom']
+            },
+            pixel: {
+                colorMode: 'color', compositeOperation: 'source-over', key: 'low',
+                lineMode: 'pixel-grid', lineWidth: 2, pathFinderCount: 60,
+                speed: 6, turningAngle: 0.3, origin: ['bottom', 'top'],
+                pixelSize: 8
+            },
+            sketch: {
+                colorMode: 'greyscale', compositeOperation: 'darken', key: 'high',
+                lineMode: 'smooth', lineWidth: 1, pathFinderCount: 150,
+                speed: 4, turningAngle: 1.2, origin: ['bottom', 'top', 'left', 'right']
+            },
+            'fibonacci-sunflower': {
+                mathMode: 'fibonacci', mathStrength: 70, pathFinderCount: 200,
+                speed: 6, turningAngle: 0.8, origin: ['center'], lineWidth: 1.5,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth'
+            },
+            'euler-ferns': {
+                mathMode: 'euler', mathStrength: 60, mathCurvatureRate: 30, mathCurvatureMax: 50,
+                pathFinderCount: 100, speed: 5, lineWidth: 1, origin: ['bottom'],
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth'
+            },
+            'lissajous-weave': {
+                mathMode: 'lissajous', mathStrength: 60, mathFreqX: 3, mathFreqY: 2, mathLissRate: 50,
+                pathFinderCount: 50, speed: 8, origin: ['center'], lineWidth: 2,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth'
+            },
+            'chaos-butterfly': {
+                mathMode: 'lorenz', mathStrength: 50, mathLorenzChaos: 28, mathLorenzDt: 50,
+                pathFinderCount: 100, speed: 6, origin: ['center'], lineWidth: 1.5,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth'
+            },
+            'flow-rivers': {
+                mathMode: 'flowfield', mathStrength: 80, mathFlowScale: 30, mathFlowOctaves: 1,
+                pathFinderCount: 500, speed: 4, origin: ['left'], lineWidth: 1,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth'
+            },
+            'murmuration': {
+                mathMode: 'boids', mathStrength: 60, mathSeparation: 70, mathAlignment: 50, mathCohesion: 30,
+                pathFinderCount: 300, speed: 5, origin: ['bottom', 'top'], lineWidth: 1.5,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth'
+            },
+            'coral-growth': {
+                mathMode: 'lsystem', mathStrength: 40, mathBranchInterval: 60, mathBranchAngle: 25, mathGenerations: 4,
+                pathFinderCount: 8, speed: 5, origin: ['bottom'], lineWidth: 2,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth'
+            },
+            'audio-rivers': {
+                mathMode: 'flowfield', mathStrength: 40, mathFlowScale: 25, mathFlowOctaves: 2,
+                pathFinderCount: 500, speed: 4, origin: ['left'], lineWidth: 1,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth',
+                audioEnabled: true, audioColorMap: 'frequency', audioGain: 120, audioRefreshRate: 4, audioLogScale: true
+            },
+            'audio-bloom': {
+                mathMode: 'none', pathFinderCount: 300, speed: 6, origin: ['center'], lineWidth: 1.5,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth',
+                radialEnabled: true, radialStrength: 30, radialRadius: 60, radialCW: 50,
+                audioEnabled: true, audioColorMap: 'frequency', audioGain: 150, audioRefreshRate: 3, audioLogScale: true
+            },
+            'audio-pulse': {
+                mathMode: 'lorenz', mathStrength: 30, mathLorenzChaos: 28, mathLorenzDt: 50,
+                pathFinderCount: 200, speed: 8, origin: ['center'], lineWidth: 2,
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low', lineMode: 'smooth',
+                audioEnabled: true, audioColorMap: 'heat', audioGain: 130, audioRefreshRate: 2, audioLogScale: true
+            }
+        };
+
+        // ============ DOM REFS ============
+        const dropZone = document.getElementById('dropZone');
+        const imageInput = document.getElementById('imageInput');
+        const sourceImage = document.getElementById('sourceImage');
+        const canvasContainer = document.getElementById('canvasContainer');
+
+        // ============ TWEAKPANE SETUP ============
+        const pane = new Tweakpane.Pane({
+            title: 'Chromata',
+            container: document.getElementById('tweakpane-container')
+        });
+
+        // -- Controls --
+        const ctrlFolder = pane.addFolder({ title: 'Controls', expanded: true });
+        ctrlFolder.addButton({ title: 'Start' }).on('click', start);
+        ctrlFolder.addButton({ title: 'Pause / Resume' }).on('click', toggle);
+        ctrlFolder.addButton({ title: 'Reset' }).on('click', reset);
+        ctrlFolder.addBinding(MONITOR, 'status', { readonly: true, label: 'Status', interval: 300 });
+        const tooltipObj = { tooltips: false };
+        ctrlFolder.addBinding(tooltipObj, 'tooltips', { label: 'Tooltips' }).on('change', function(ev) {
+            document.getElementById('tweakpane-container').classList.toggle('tooltips-on', ev.value);
+        });
+
+        // -- Presets --
+        const presetsFolder = pane.addFolder({ title: 'Presets', expanded: false });
+        Object.keys(presets).forEach(function(name) {
+            presetsFolder.addButton({ title: name.charAt(0).toUpperCase() + name.slice(1) })
+                .on('click', function() { applyPreset(name); });
+        });
+        const myPresetsFolder = presetsFolder.addFolder({ title: 'My Presets', expanded: false });
+        const presetNameObj = { name: '' };
+        myPresetsFolder.addBinding(presetNameObj, 'name', { label: 'Name' });
+        myPresetsFolder.addButton({ title: 'Save Current' }).on('click', savePreset);
+        let savedPresetsFolder = null;
+
+        function rebuildSavedPresets() {
+            if (savedPresetsFolder) savedPresetsFolder.dispose();
+            savedPresetsFolder = null;
+            var saved = getSavedPresets();
+            var names = Object.keys(saved).sort();
+            if (names.length === 0) return;
+            savedPresetsFolder = myPresetsFolder.addFolder({ title: 'Saved', expanded: true });
+            names.forEach(function(n) {
+                var f = savedPresetsFolder.addFolder({ title: n, expanded: false });
+                f.addButton({ title: 'Load' }).on('click', function() { loadSavedPreset(n); });
+                f.addButton({ title: 'Delete' }).on('click', function() { deleteSavedPreset(n); });
+            });
+        }
+
+        // -- Quick States (session-only, max 10) --
+        var saveStates = [];
+        const quickStatesFolder = pane.addFolder({ title: 'Quick States', expanded: false });
+        quickStatesFolder.addButton({ title: 'Quick Save (Q)' }).on('click', function() { quickSave(); });
+        let quickStatesListFolder = null;
+
+        function quickSave(name) {
+            if (saveStates.length >= 10) saveStates.shift();
+            var snapshot = JSON.parse(JSON.stringify(PARAMS));
+            saveStates.push({
+                name: name || 'State ' + (saveStates.length + 1),
+                params: snapshot,
+                timestamp: Date.now()
+            });
+            rebuildQuickStateUI();
+            MONITOR.status = 'State saved (' + saveStates.length + '/10)';
+        }
+
+        function quickRestore(index) {
+            if (index < 0 || index >= saveStates.length) return;
+            var restored = JSON.parse(JSON.stringify(saveStates[index].params));
+            Object.assign(PARAMS, restored);
+            PARAMS.forceNodes = restored.forceNodes || [];
+            rebuildForceNodeUI();
+            pane.refresh();
+            if (chromata && chromata.isRunning) {
+                chromata.updateOptions(getOptionsForLiveUpdate());
+            }
+            MONITOR.status = 'Restored: ' + saveStates[index].name;
+        }
+
+        function rebuildQuickStateUI() {
+            if (quickStatesListFolder) quickStatesListFolder.dispose();
+            quickStatesListFolder = null;
+            if (saveStates.length === 0) return;
+            quickStatesListFolder = quickStatesFolder.addFolder({ title: 'States (' + saveStates.length + ')', expanded: true });
+            saveStates.forEach(function(state, idx) {
+                var f = quickStatesListFolder.addFolder({ title: state.name, expanded: false });
+                f.addButton({ title: 'Restore' }).on('click', function() { quickRestore(idx); });
+                f.addButton({ title: 'Delete' }).on('click', function() {
+                    saveStates.splice(idx, 1);
+                    rebuildQuickStateUI();
+                    MONITOR.status = 'State deleted';
+                });
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.key === 'q' && !e.shiftKey) {
+                quickSave();
+            } else if (e.key === 'Q' && e.shiftKey) {
+                if (saveStates.length > 0) quickRestore(saveStates.length - 1);
+            }
+        });
+
+        // -- Dynamic Presets (Recording & Playback) --
+        var dynamicPresets = [];
+        var recording = { active: false, startIteration: 0, baseline: null, changes: [] };
+        var playback = { active: false, preset: null, keyframeIndex: 0, startIteration: 0 };
+
+        const dynFolder = pane.addFolder({ title: 'Dynamic Presets', expanded: false });
+        const recBtn = dynFolder.addButton({ title: 'Start Recording' });
+        recBtn.on('click', function() {
+            if (!recording.active) {
+                if (!chromata || !chromata.isRunning) { MONITOR.status = 'Start animation first'; return; }
+                recording.active = true;
+                recording.startIteration = chromata.iterationCount;
+                recording.baseline = JSON.parse(JSON.stringify(PARAMS));
+                recording.changes = [];
+                recBtn.title = 'Stop & Save';
+                MONITOR.status = 'Recording...';
+            } else {
+                var preset = {
+                    name: 'Recording ' + (dynamicPresets.length + 1),
+                    baseline: recording.baseline,
+                    changes: recording.changes,
+                    totalIterations: chromata ? chromata.iterationCount - recording.startIteration : 0
+                };
+                dynamicPresets.push(preset);
+                recording.active = false;
+                recording.baseline = null;
+                recording.changes = [];
+                recBtn.title = 'Start Recording';
+                rebuildDynamicPresetsUI();
+                MONITOR.status = 'Saved: ' + preset.name + ' (' + preset.changes.length + ' keyframes)';
+            }
+        });
+
+        let dynListFolder = null;
+        let dynTimelineFolder = null;
+
+        function rebuildDynamicPresetsUI() {
+            if (dynListFolder) dynListFolder.dispose();
+            dynListFolder = null;
+            if (dynamicPresets.length === 0) return;
+            dynListFolder = dynFolder.addFolder({ title: 'Saved (' + dynamicPresets.length + ')', expanded: true });
+            dynamicPresets.forEach(function(preset, idx) {
+                var f = dynListFolder.addFolder({ title: preset.name + ' (' + preset.changes.length + ' kf)', expanded: false });
+                f.addButton({ title: 'Play Back' }).on('click', function() { startPlayback(idx); });
+                f.addButton({ title: 'Edit Timeline' }).on('click', function() { openTimelineEditor(idx); });
+                f.addButton({ title: 'Delete' }).on('click', function() {
+                    dynamicPresets.splice(idx, 1);
+                    rebuildDynamicPresetsUI();
+                    MONITOR.status = 'Dynamic preset deleted';
+                });
+            });
+        }
+
+        function startPlayback(idx) {
+            if (!chromata || !chromata.isRunning) { MONITOR.status = 'Start animation first'; return; }
+            var preset = dynamicPresets[idx];
+            if (!preset || preset.changes.length === 0) { MONITOR.status = 'No keyframes to play'; return; }
+            // Apply baseline
+            Object.assign(PARAMS, JSON.parse(JSON.stringify(preset.baseline)));
+            PARAMS.forceNodes = preset.baseline.forceNodes ? JSON.parse(JSON.stringify(preset.baseline.forceNodes)) : [];
+            rebuildForceNodeUI();
+            pane.refresh();
+            chromata.updateOptions(getOptionsForLiveUpdate());
+            // Set up playback
+            playback.active = true;
+            playback.preset = preset;
+            playback.keyframeIndex = 0;
+            playback.startIteration = chromata.iterationCount;
+            MONITOR.status = 'Playing: ' + preset.name;
+        }
+
+        function tickPlayback() {
+            if (!playback.active || !chromata || !chromata.isRunning) return;
+            var elapsed = chromata.iterationCount - playback.startIteration;
+            var applied = false;
+            while (playback.keyframeIndex < playback.preset.changes.length) {
+                var kf = playback.preset.changes[playback.keyframeIndex];
+                if (kf.iteration <= elapsed) {
+                    Object.assign(PARAMS, JSON.parse(JSON.stringify(kf.params)));
+                    PARAMS.forceNodes = kf.params.forceNodes ? JSON.parse(JSON.stringify(kf.params.forceNodes)) : [];
+                    playback.keyframeIndex++;
+                    applied = true;
+                } else {
+                    break;
+                }
+            }
+            if (applied) {
+                rebuildForceNodeUI();
+                pane.refresh();
+                chromata.updateOptions(getOptionsForLiveUpdate());
+            }
+            if (playback.keyframeIndex >= playback.preset.changes.length) {
+                playback.active = false;
+                MONITOR.status = 'Playback complete';
+            }
+        }
+
+        function openTimelineEditor(idx) {
+            var preset = dynamicPresets[idx];
+            if (!preset) return;
+            if (dynTimelineFolder) dynTimelineFolder.dispose();
+            dynTimelineFolder = dynFolder.addFolder({ title: 'Timeline: ' + preset.name, expanded: true });
+
+            dynTimelineFolder.addButton({ title: 'Sort by Iteration' }).on('click', function() {
+                preset.changes.sort(function(a, b) { return a.iteration - b.iteration; });
+                openTimelineEditor(idx);
+            });
+
+            preset.changes.forEach(function(kf, ki) {
+                var changed = [];
+                var base = preset.baseline;
+                for (var k in kf.params) {
+                    if (k === 'forceNodes') continue;
+                    if (kf.params[k] !== base[k]) changed.push(k);
+                }
+                var summary = changed.slice(0, 3).join(', ') || 'no diff';
+                var kfFolder = dynTimelineFolder.addFolder({ title: '#' + (ki + 1) + ' @ iter ' + kf.iteration, expanded: false });
+
+                var iterObj = { iteration: kf.iteration };
+                kfFolder.addBinding(iterObj, 'iteration', { label: 'Iteration', min: 0, step: 1 }).on('change', function(ev) {
+                    kf.iteration = ev.value;
+                });
+
+                var summaryObj = { changes: summary };
+                kfFolder.addBinding(summaryObj, 'changes', { readonly: true, label: 'Changed' });
+
+                kfFolder.addButton({ title: 'Preview' }).on('click', function() {
+                    Object.assign(PARAMS, JSON.parse(JSON.stringify(kf.params)));
+                    PARAMS.forceNodes = kf.params.forceNodes ? JSON.parse(JSON.stringify(kf.params.forceNodes)) : [];
+                    rebuildForceNodeUI();
+                    pane.refresh();
+                    if (chromata && chromata.isRunning) {
+                        chromata.updateOptions(getOptionsForLiveUpdate());
+                    }
+                    MONITOR.status = 'Preview keyframe #' + (ki + 1);
+                });
+
+                kfFolder.addButton({ title: 'Delete' }).on('click', function() {
+                    preset.changes.splice(ki, 1);
+                    openTimelineEditor(idx);
+                });
+            });
+
+            dynTimelineFolder.addButton({ title: 'Close Editor' }).on('click', function() {
+                if (dynTimelineFolder) { dynTimelineFolder.dispose(); dynTimelineFolder = null; }
+            });
+        }
+
+        // -- Display --
+        const displayFolder = pane.addFolder({ title: 'Display', expanded: false });
+        displayFolder.addBinding(PARAMS, 'colorMode', {
+            label: 'Color', options: { Color: 'color', Greyscale: 'greyscale' }
+        });
+        displayFolder.addBinding(PARAMS, 'key', {
+            options: { Low: 'low', High: 'high' }
+        });
+        displayFolder.addBinding(PARAMS, 'lineMode', {
+            label: 'Line', options: { Smooth: 'smooth', Square: 'square', Point: 'point', 'Pixel Grid': 'pixel-grid' }
+        }).on('change', function(ev) {
+            pixelSizeBinding.element.style.display = ev.value === 'pixel-grid' ? '' : 'none';
+        });
+        const pixelSizeBinding = displayFolder.addBinding(PARAMS, 'pixelSize', {
+            label: 'Pixel Size', min: 2, max: 50, step: 1
+        });
+        pixelSizeBinding.element.style.display = PARAMS.lineMode === 'pixel-grid' ? '' : 'none';
+        displayFolder.addBinding(PARAMS, 'compositeOperation', {
+            label: 'Blend', options: {
+                Lighten: 'lighten', 'Source Over': 'source-over',
+                Multiply: 'multiply', Screen: 'screen', Overlay: 'overlay',
+                Darken: 'darken', 'Color Dodge': 'color-dodge',
+                'Color Burn': 'color-burn', 'Hard Light': 'hard-light',
+                'Soft Light': 'soft-light', Difference: 'difference',
+                Exclusion: 'exclusion', Hue: 'hue',
+                Saturation: 'saturation', Color: 'color',
+                Luminosity: 'luminosity'
+            }
+        });
+        displayFolder.addBinding(PARAMS, 'outputSize', {
+            label: 'Size', options: { Container: 'container', Original: 'original' }
+        });
+        displayFolder.addBinding(PARAMS, 'backgroundColor', { label: 'BG Color' });
+        displayFolder.addBinding(PARAMS, 'backgroundAlpha', {
+            label: 'BG Alpha %', min: 0, max: 100, step: 1
+        });
+
+        // -- Path Finders --
+        const pfFolder = pane.addFolder({ title: 'Path Finders', expanded: true });
+        pfFolder.addBinding(PARAMS, 'pathFinderCount', { label: 'Count', min: 1, max: 5000, step: 1 });
+        pfFolder.addBinding(PARAMS, 'speed', { min: 1, max: 100, step: 1 });
+        pfFolder.addBinding(PARAMS, 'lineWidth', { label: 'Width', min: 0.5, max: 100, step: 0.5 });
+        pfFolder.addBinding(PARAMS, 'turningAngle', { label: 'Angle (xPi)', min: 0.01, max: 3, step: 0.01 });
+        pfFolder.addBinding(PARAMS, 'sampleSize', { label: 'Sample', min: 2, max: 64, step: 1 });
+        pfFolder.addBinding(PARAMS, 'lineOpacity', { label: 'Opacity %', min: 1, max: 100, step: 0.5 });
+        pfFolder.addBinding(PARAMS, 'jitter', { label: 'Jitter %', min: 0, max: 100, step: 0.5 });
+        pfFolder.addBinding(PARAMS, 'edgeDetect', { label: 'Edges %', min: 0, max: 100, step: 1 });
+        pfFolder.addBinding(PARAMS, 'alphaThreshold', { label: 'Alpha', min: 1, max: 255, step: 1 });
+        pfFolder.addBinding(PARAMS, 'iterationLimit', { label: 'Limit', min: 0, max: 50000, step: 50 });
+        pfFolder.addBinding(PARAMS, 'stepsPerFrame', { label: 'Steps/Frame', min: 1, max: 20, step: 1 });
+        pfFolder.addBinding(PARAMS, 'seed', { label: 'Seed' });
+
+        // -- Origins --
+        const originsFolder = pane.addFolder({ title: 'Origins', expanded: false });
+        originsFolder.addBinding(PARAMS, 'originBottom', { label: 'Bottom' });
+        originsFolder.addBinding(PARAMS, 'originTop', { label: 'Top' });
+        originsFolder.addBinding(PARAMS, 'originLeft', { label: 'Left' });
+        originsFolder.addBinding(PARAMS, 'originRight', { label: 'Right' });
+        originsFolder.addBinding(PARAMS, 'customOrigin', { label: 'Custom' });
+
+        // -- Radial --
+        const radialFolder = pane.addFolder({ title: 'Radial', expanded: false });
+        radialFolder.addBinding(PARAMS, 'radialEnabled', { label: 'Enable' });
+        radialFolder.addBinding(PARAMS, 'radialStrength', { label: 'Strength %', min: 0, max: 100, step: 1 });
+        radialFolder.addBinding(PARAMS, 'radialRadius', { label: 'Radius %', min: 1, max: 100, step: 1 });
+        radialFolder.addBinding(PARAMS, 'radialCW', { label: 'CW %', min: 0, max: 100, step: 1 });
+        radialFolder.addBinding(PARAMS, 'radialPercent', { label: 'Bound %', min: 0, max: 100, step: 1 });
+        radialFolder.addBinding(PARAMS, 'radialCenterX', { label: 'Center X %', min: 0, max: 100, step: 1 });
+        radialFolder.addBinding(PARAMS, 'radialCenterY', { label: 'Center Y %', min: 0, max: 100, step: 1 });
+        radialFolder.addBinding(PARAMS, 'radialDrift', { label: 'Drift', min: 0, max: 100, step: 1 });
+        radialFolder.addBinding(PARAMS, 'radialDriftSpread', { label: 'Drift Spread', min: 0, max: 100, step: 1 });
+        radialFolder.addBinding(PARAMS, 'radialOnConverge', {
+            label: 'On Converge', options: { Stick: 'stick', Pulse: 'pulse', Explode: 'explode' }
+        });
+        radialFolder.addBinding(PARAMS, 'radialMinRadius', { label: 'Min Radius %', min: 1, max: 50, step: 1 });
+
+        // -- Force Nodes --
+        const forceNodesFolder = pane.addFolder({ title: 'Force Nodes', expanded: false });
+        function makeForceNode(type) {
+            return { type: type, x: 50, y: 50, radius: 15, strength: 50, ring: 0, falloff: 50,
+                     direction: 0, orbit: 0, orbitSpeed: 10, pulse: 0, brightnessMode: 'off' };
+        }
+        forceNodesFolder.addButton({ title: '+ Gravity' }).on('click', function() {
+            PARAMS.forceNodes.push(makeForceNode('gravity'));
+            rebuildForceNodeUI(); drawFaceOverlay();
+        });
+        forceNodesFolder.addButton({ title: '+ Repulsion' }).on('click', function() {
+            PARAMS.forceNodes.push(makeForceNode('repulsion'));
+            rebuildForceNodeUI(); drawFaceOverlay();
+        });
+        forceNodesFolder.addButton({ title: '+ Vortex' }).on('click', function() {
+            PARAMS.forceNodes.push(makeForceNode('vortex'));
+            rebuildForceNodeUI(); drawFaceOverlay();
+        });
+        forceNodesFolder.addButton({ title: '+ Directional' }).on('click', function() {
+            PARAMS.forceNodes.push(makeForceNode('directional'));
+            rebuildForceNodeUI(); drawFaceOverlay();
+        });
+        var forceNodeSubfolders = [];
+        // Click-to-place state
+        var placeMode = null; // null or force type string
+        var placeModeBtn = null;
+        // Drag state
+        var dragNodeIdx = -1, isDragging = false;
+
+        function rebuildForceNodeUI() {
+            forceNodeSubfolders.forEach(function(f) { f.dispose(); });
+            forceNodeSubfolders = [];
+            PARAMS.forceNodes.forEach(function(node, idx) {
+                // Ensure new properties exist on old/preset nodes
+                if (node.direction == null) node.direction = 0;
+                if (node.orbit == null) node.orbit = 0;
+                if (node.orbitSpeed == null) node.orbitSpeed = 10;
+                if (node.pulse == null) node.pulse = 0;
+                if (node.brightnessMode == null) node.brightnessMode = 'off';
+                var typeLabels = { gravity: 'Gravity', repulsion: 'Repulsion', vortex: 'Vortex', directional: 'Directional' };
+                var label = (idx + 1) + '. ' + (typeLabels[node.type] || node.type);
+                var f = forceNodesFolder.addFolder({ title: label, expanded: true });
+                forceNodeSubfolders.push(f);
+                f.addBinding(node, 'type', {
+                    label: 'Type', options: { Gravity: 'gravity', Repulsion: 'repulsion', Vortex: 'vortex', Directional: 'directional' }
+                }).on('change', function() { rebuildForceNodeUI(); drawFaceOverlay(); });
+                f.addBinding(node, 'x', { label: 'X %', min: 0, max: 100, step: 1 }).on('change', function() { drawFaceOverlay(); });
+                f.addBinding(node, 'y', { label: 'Y %', min: 0, max: 100, step: 1 }).on('change', function() { drawFaceOverlay(); });
+                f.addBinding(node, 'radius', { label: 'Radius %', min: 1, max: 100, step: 1 }).on('change', function() { drawFaceOverlay(); });
+                f.addBinding(node, 'strength', { label: 'Strength %', min: 1, max: 100, step: 1 }).on('change', function() { drawFaceOverlay(); });
+                f.addBinding(node, 'ring', { label: 'Ring %', min: 0, max: 95, step: 1 }).on('change', function() { drawFaceOverlay(); });
+                f.addBinding(node, 'falloff', { label: 'Falloff %', min: 0, max: 100, step: 1 }).on('change', function() { drawFaceOverlay(); });
+                // Direction: shown for vortex and directional
+                if (node.type === 'vortex' || node.type === 'directional') {
+                    f.addBinding(node, 'direction', {
+                        label: node.type === 'vortex' ? 'CW/CCW' : 'Heading°',
+                        min: 0, max: 360, step: 1
+                    }).on('change', function() { drawFaceOverlay(); });
+                }
+                // Animation controls
+                f.addBinding(node, 'orbit', { label: 'Orbit %', min: 0, max: 50, step: 1 }).on('change', function() { drawFaceOverlay(); });
+                f.addBinding(node, 'orbitSpeed', { label: 'Orbit Spd %', min: 1, max: 100, step: 1 });
+                f.addBinding(node, 'pulse', { label: 'Pulse Hz', min: 0, max: 2, step: 0.1 });
+                // Brightness modulation
+                f.addBinding(node, 'brightnessMode', {
+                    label: 'Brightness', options: { Off: 'off', Bright: 'bright', Dark: 'dark' }
+                });
+                f.addButton({ title: 'Remove' }).on('click', function() {
+                    PARAMS.forceNodes.splice(idx, 1);
+                    rebuildForceNodeUI();
+                    drawFaceOverlay();
+                });
+            });
+            // Attach tooltips to dynamically-created force node controls
+            var fnTipMap = {
+                'Type': 'forceNodeType', 'Radius %': 'forceNodeRadius',
+                'Strength %': 'forceNodeStrength', 'Ring %': 'forceNodeRing',
+                'Falloff %': 'forceNodeFalloff', 'CW/CCW': 'forceNodeDirection',
+                'Heading°': 'forceNodeDirection', 'Orbit %': 'forceNodeOrbit',
+                'Orbit Spd %': 'forceNodeOrbitSpeed', 'Pulse Hz': 'forceNodePulse',
+                'Brightness': 'forceNodeBrightness'
+            };
+            forceNodeSubfolders.forEach(function(sf) {
+                sf.element.querySelectorAll('.tp-lblv').forEach(function(el) {
+                    var lbl = el.querySelector('.tp-lblv_l');
+                    if (!lbl) return;
+                    var key = fnTipMap[lbl.textContent.trim()];
+                    if (key && tips[key]) el.setAttribute('data-tip', tips[key]);
+                });
+            });
+        }
+
+        // -- Focus --
+        const focusFolder = pane.addFolder({ title: 'Focus', expanded: false });
+        focusFolder.addBinding(PARAMS, 'focusEnabled', { label: 'Focus' });
+        focusFolder.addButton({ title: 'Detect Faces' }).on('click', function() {
+            if (!faceApiReady) { MONITOR.status = 'Face model loading...'; return; }
+            if (!sourceImage.src || sourceImage.classList.contains('hidden')) { MONITOR.status = 'Load an image first'; return; }
+            detectFaces();
+        });
+        focusFolder.addBinding(PARAMS, 'focusPercent', { label: 'Density %', min: 0, max: 100, step: 1 });
+        focusFolder.addBinding(PARAMS, 'faceGravity', { label: 'Gravity %', min: 0, max: 100, step: 1 });
+        const FACE_MONITOR = { detected: 'None' };
+        focusFolder.addBinding(FACE_MONITOR, 'detected', { readonly: true, label: 'Detected', interval: 500 });
+
+        const manualFolder = focusFolder.addFolder({ title: 'Manual Override', expanded: false });
+        manualFolder.addBinding(PARAMS, 'focusX', { label: 'Focus X %', min: 0, max: 100, step: 1 });
+        manualFolder.addBinding(PARAMS, 'focusY', { label: 'Focus Y %', min: 0, max: 100, step: 1 });
+        manualFolder.addBinding(PARAMS, 'focusWidth', { label: 'Width %', min: 1, max: 100, step: 1 });
+        manualFolder.addBinding(PARAMS, 'focusHeight', { label: 'Height %', min: 1, max: 100, step: 1 });
+
+        // Face detection
+        async function detectFaces() {
+            if (!faceApiReady || !sourceImage.naturalWidth) return;
+            MONITOR.status = 'Detecting faces...';
+            try {
+                // Use a temp canvas at natural resolution for consistent detection
+                var natW = sourceImage.naturalWidth;
+                var natH = sourceImage.naturalHeight;
+                var tmpCanvas = document.createElement('canvas');
+                tmpCanvas.width = natW;
+                tmpCanvas.height = natH;
+                tmpCanvas.getContext('2d').drawImage(sourceImage, 0, 0, natW, natH);
+
+                console.log('[face-detect] Image natural size:', natW, 'x', natH);
+                console.log('[face-detect] TinyFaceDetector loaded:', faceapi.nets.tinyFaceDetector.isLoaded);
+
+                var results = await faceapi.detectAllFaces(
+                    tmpCanvas,
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.5 })
+                ).withFaceLandmarks();
+                console.log('[face-detect] TinyFaceDetector:', results.length, 'faces with landmarks');
+
+                // Fallback to SSD Mobilenet if TinyFaceDetector found nothing
+                if (results.length === 0 && faceapi.nets.ssdMobilenetv1.isLoaded) {
+                    console.log('[face-detect] Trying SSD Mobilenet fallback...');
+                    results = await faceapi.detectAllFaces(
+                        tmpCanvas,
+                        new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 })
+                    ).withFaceLandmarks();
+                    console.log('[face-detect] SSD Mobilenet:', results.length, 'faces with landmarks');
+                }
+
+                // Filter out false positives
+                var imgArea = natW * natH;
+                results = results.filter(function(r) {
+                    var box = r.detection.box;
+                    var boxArea = box.width * box.height;
+                    var areaRatio = boxArea / imgArea;
+                    var aspect = box.width / box.height;
+                    if (areaRatio > 0.2) {
+                        console.log('[face-detect] Rejected oversized box:', Math.round(areaRatio * 100) + '% of image');
+                        return false;
+                    }
+                    if (aspect < 0.5 || aspect > 1.8) {
+                        console.log('[face-detect] Rejected bad aspect ratio:', aspect.toFixed(2));
+                        return false;
+                    }
+                    return true;
+                });
+
+                // Build detectedFaces with padded boxes AND 68 landmark positions
+                var PAD = 0.4;
+                detectedFaces = results.map(function(r) {
+                    var box = r.detection.box;
+                    var padX = box.width * PAD / 2;
+                    var padY = box.height * PAD / 2;
+                    var x = Math.max(0, Math.round(box.x - padX));
+                    var y = Math.max(0, Math.round(box.y - padY));
+                    var w = Math.min(natW - x, Math.round(box.width + padX * 2));
+                    var h = Math.min(natH - y, Math.round(box.height + padY * 2));
+                    // Extract 68 landmark positions in natural image coordinates
+                    var landmarks = r.landmarks.positions.map(function(p) {
+                        return { x: Math.round(p.x), y: Math.round(p.y) };
+                    });
+                    return { x: x, y: y, width: w, height: h, landmarks: landmarks };
+                });
+
+                if (detectedFaces.length > 0) {
+                    PARAMS.focusEnabled = true;
+                    pane.refresh();
+                    FACE_MONITOR.detected = detectedFaces.length + ' face' + (detectedFaces.length > 1 ? 's' : '');
+                    MONITOR.status = detectedFaces.length + ' face' + (detectedFaces.length > 1 ? 's' : '') + ' detected';
+                } else {
+                    FACE_MONITOR.detected = 'None';
+                    MONITOR.status = 'No faces detected';
+                }
+                drawFaceOverlay();
+            } catch (err) {
+                console.error('Face detection error:', err);
+                MONITOR.status = 'Face detection failed';
+            }
+        }
+
+        // Draw orange rectangles on overlay canvas
+        function drawFaceOverlay() {
+            var hasForceNodes = PARAMS.forceNodes && PARAMS.forceNodes.length > 0;
+            if (!sourceImage.naturalWidth || sourceImage.classList.contains('hidden') || (detectedFaces.length === 0 && !hasForceNodes)) {
+                faceOverlayCanvas.classList.add('hidden');
+                return;
+            }
+            faceOverlayCanvas.classList.remove('hidden');
+            var imgRect = sourceImage.getBoundingClientRect();
+            var wrapRect = document.getElementById('imgWrapper').getBoundingClientRect();
+            faceOverlayCanvas.width = wrapRect.width;
+            faceOverlayCanvas.height = wrapRect.height;
+            var offX = imgRect.left - wrapRect.left;
+            var offY = imgRect.top - wrapRect.top;
+            var displayW = imgRect.width;
+            var displayH = imgRect.height;
+            var natW = sourceImage.naturalWidth;
+            var natH = sourceImage.naturalHeight;
+            var sx = displayW / natW;
+            var sy = displayH / natH;
+
+            faceOverlayCtx.clearRect(0, 0, faceOverlayCanvas.width, faceOverlayCanvas.height);
+            detectedFaces.forEach(function(face, idx) {
+                var x = offX + face.x * sx;
+                var y = offY + face.y * sy;
+                var w = face.width * sx;
+                var h = face.height * sy;
+                faceOverlayCtx.strokeStyle = 'rgba(255, 100, 50, 0.85)';
+                faceOverlayCtx.lineWidth = 2;
+                faceOverlayCtx.strokeRect(x, y, w, h);
+                faceOverlayCtx.fillStyle = 'rgba(255, 100, 50, 0.12)';
+                faceOverlayCtx.fillRect(x, y, w, h);
+                faceOverlayCtx.fillStyle = 'rgba(255, 100, 50, 0.85)';
+                faceOverlayCtx.font = '11px -apple-system, sans-serif';
+                faceOverlayCtx.fillText('Face ' + (idx + 1), x + 4, y + 14);
+                // Draw landmark dots
+                if (face.landmarks) {
+                    faceOverlayCtx.fillStyle = 'rgba(0, 255, 150, 0.8)';
+                    face.landmarks.forEach(function(lm) {
+                        faceOverlayCtx.beginPath();
+                        faceOverlayCtx.arc(offX + lm.x * sx, offY + lm.y * sy, 2, 0, Math.PI * 2);
+                        faceOverlayCtx.fill();
+                    });
+                }
+            });
+
+            // Force node overlays
+            if (hasForceNodes) {
+                var fnMinDim = Math.min(natW, natH);
+                var fnScale = Math.min(sx, sy);
+                PARAMS.forceNodes.forEach(function(node, nIdx) {
+                    var cx = offX + (node.x / 100) * natW * sx;
+                    var cy = offY + (node.y / 100) * natH * sy;
+                    var outerR = (fnMinDim / 2 * node.radius / 100) * fnScale;
+                    var innerR = outerR * (node.ring / 100);
+                    var strength01 = node.strength / 100;
+                    var falloff01 = node.falloff / 100;
+                    var sigma = outerR * (1 + falloff01 * 2);
+                    // Type-specific colors
+                    var baseR, baseG, baseB;
+                    switch (node.type) {
+                        case 'vortex': baseR = 60; baseG = 200; baseB = 200; break;      // teal
+                        case 'directional': baseR = 255; baseG = 200; baseB = 60; break;  // yellow
+                        case 'repulsion': baseR = 255; baseG = 60; baseB = 60; break;     // red
+                        default: baseR = 60; baseG = 120; baseB = 255; break;              // blue (gravity)
+                    }
+
+                    // Radial gradient matching force profile
+                    var gradientEnd = outerR + sigma * 3;
+                    if (gradientEnd < outerR + 10) gradientEnd = outerR + 10;
+                    var grad = faceOverlayCtx.createRadialGradient(cx, cy, 0, cx, cy, gradientEnd);
+                    var maxAlpha = Math.min(strength01 * 0.25, 0.25);
+                    var stops = 24;
+                    for (var si = 0; si <= stops; si++) {
+                        var t = si / stops;
+                        var r = t * gradientEnd;
+                        var force;
+                        if (r < innerR) {
+                            force = (innerR > 0) ? (r / innerR) * strength01 : strength01;
+                        } else if (r <= outerR) {
+                            force = strength01;
+                        } else {
+                            var d = r - outerR;
+                            force = strength01 * Math.exp(-(d * d) / (2 * sigma * sigma));
+                        }
+                        var alpha = (force / (strength01 || 1)) * maxAlpha;
+                        grad.addColorStop(t, 'rgba(' + baseR + ',' + baseG + ',' + baseB + ',' + alpha.toFixed(4) + ')');
+                    }
+                    faceOverlayCtx.fillStyle = grad;
+                    faceOverlayCtx.beginPath();
+                    faceOverlayCtx.arc(cx, cy, gradientEnd, 0, Math.PI * 2);
+                    faceOverlayCtx.fill();
+
+                    // Solid stroke at outer radius
+                    faceOverlayCtx.strokeStyle = 'rgba(' + baseR + ',' + baseG + ',' + baseB + ', 0.6)';
+                    faceOverlayCtx.lineWidth = 1.5;
+                    faceOverlayCtx.setLineDash([]);
+                    faceOverlayCtx.beginPath();
+                    faceOverlayCtx.arc(cx, cy, outerR, 0, Math.PI * 2);
+                    faceOverlayCtx.stroke();
+
+                    // Dashed stroke at inner radius (donut)
+                    if (innerR > 1) {
+                        faceOverlayCtx.setLineDash([4, 4]);
+                        faceOverlayCtx.beginPath();
+                        faceOverlayCtx.arc(cx, cy, innerR, 0, Math.PI * 2);
+                        faceOverlayCtx.stroke();
+                        faceOverlayCtx.setLineDash([]);
+                    }
+
+                    // Orbit path indicator
+                    if (node.orbit > 0) {
+                        var orbitDispR = (fnMinDim / 2 * node.orbit / 100) * fnScale;
+                        faceOverlayCtx.strokeStyle = 'rgba(' + baseR + ',' + baseG + ',' + baseB + ', 0.3)';
+                        faceOverlayCtx.lineWidth = 1;
+                        faceOverlayCtx.setLineDash([3, 5]);
+                        faceOverlayCtx.beginPath();
+                        faceOverlayCtx.arc(cx, cy, orbitDispR, 0, Math.PI * 2);
+                        faceOverlayCtx.stroke();
+                        faceOverlayCtx.setLineDash([]);
+                    }
+
+                    // Vortex: curved arrow indicator
+                    if (node.type === 'vortex') {
+                        var ccw = (node.direction || 0) >= 180;
+                        var arcStart = -Math.PI / 4;
+                        var arcEnd = ccw ? arcStart - Math.PI : arcStart + Math.PI;
+                        faceOverlayCtx.strokeStyle = 'rgba(' + baseR + ',' + baseG + ',' + baseB + ', 0.7)';
+                        faceOverlayCtx.lineWidth = 2;
+                        faceOverlayCtx.beginPath();
+                        faceOverlayCtx.arc(cx, cy, outerR * 0.5, arcStart, arcEnd, ccw);
+                        faceOverlayCtx.stroke();
+                        // Arrowhead at end
+                        var endX = cx + outerR * 0.5 * Math.cos(arcEnd);
+                        var endY = cy + outerR * 0.5 * Math.sin(arcEnd);
+                        var arrowAngle = ccw ? arcEnd + Math.PI / 2 : arcEnd - Math.PI / 2;
+                        faceOverlayCtx.beginPath();
+                        faceOverlayCtx.moveTo(endX, endY);
+                        faceOverlayCtx.lineTo(endX + 8 * Math.cos(arrowAngle - 0.4), endY + 8 * Math.sin(arrowAngle - 0.4));
+                        faceOverlayCtx.moveTo(endX, endY);
+                        faceOverlayCtx.lineTo(endX + 8 * Math.cos(arrowAngle + 0.4), endY + 8 * Math.sin(arrowAngle + 0.4));
+                        faceOverlayCtx.stroke();
+                    }
+
+                    // Directional: compass arrow
+                    if (node.type === 'directional') {
+                        var dirRad = (node.direction || 0) * Math.PI / 180;
+                        var arrowLen = outerR * 0.7;
+                        var ax = cx + arrowLen * Math.cos(dirRad);
+                        var ay = cy + arrowLen * Math.sin(dirRad);
+                        faceOverlayCtx.strokeStyle = 'rgba(' + baseR + ',' + baseG + ',' + baseB + ', 0.8)';
+                        faceOverlayCtx.lineWidth = 2;
+                        faceOverlayCtx.beginPath();
+                        faceOverlayCtx.moveTo(cx, cy);
+                        faceOverlayCtx.lineTo(ax, ay);
+                        faceOverlayCtx.stroke();
+                        // Arrowhead
+                        faceOverlayCtx.beginPath();
+                        faceOverlayCtx.moveTo(ax, ay);
+                        faceOverlayCtx.lineTo(ax - 8 * Math.cos(dirRad - 0.4), ay - 8 * Math.sin(dirRad - 0.4));
+                        faceOverlayCtx.moveTo(ax, ay);
+                        faceOverlayCtx.lineTo(ax - 8 * Math.cos(dirRad + 0.4), ay - 8 * Math.sin(dirRad + 0.4));
+                        faceOverlayCtx.stroke();
+                    }
+
+                    // Center dot (larger when draggable)
+                    faceOverlayCtx.fillStyle = 'rgba(' + baseR + ',' + baseG + ',' + baseB + ', 0.8)';
+                    faceOverlayCtx.beginPath();
+                    faceOverlayCtx.arc(cx, cy, 4, 0, Math.PI * 2);
+                    faceOverlayCtx.fill();
+
+                    // Index label
+                    faceOverlayCtx.fillStyle = 'rgba(' + baseR + ',' + baseG + ',' + baseB + ', 0.9)';
+                    faceOverlayCtx.font = '10px -apple-system, sans-serif';
+                    faceOverlayCtx.fillText((nIdx + 1), cx + 6, cy - 6);
+                });
+            }
+        }
+
+        window.addEventListener('resize', function() { drawFaceOverlay(); });
+
+        // -- Click-to-Place System --
+        var placeTypeObj = { type: 'gravity' };
+        forceNodesFolder.addSeparator();
+        forceNodesFolder.addBinding(placeTypeObj, 'type', {
+            label: 'Place Type', options: { Gravity: 'gravity', Repulsion: 'repulsion', Vortex: 'vortex', Directional: 'directional' }
+        });
+        placeModeBtn = forceNodesFolder.addButton({ title: 'Place Mode: OFF' });
+        placeModeBtn.on('click', function() {
+            placeMode = placeMode ? null : placeTypeObj.type;
+            placeModeBtn.title = placeMode ? 'Place Mode: ON (' + placeMode + ')' : 'Place Mode: OFF';
+            faceOverlayCanvas.style.pointerEvents = placeMode ? 'auto' : 'none';
+            faceOverlayCanvas.style.cursor = placeMode ? 'crosshair' : '';
+            MONITOR.status = placeMode ? 'Click image to place ' + placeMode + ' node (ESC to cancel)' : 'Place mode off';
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && placeMode) {
+                placeMode = null;
+                placeModeBtn.title = 'Place Mode: OFF';
+                faceOverlayCanvas.style.pointerEvents = 'none';
+                faceOverlayCanvas.style.cursor = '';
+                MONITOR.status = 'Place mode cancelled';
+            }
+        });
+
+        function overlayToImagePercent(e) {
+            var imgRect = sourceImage.getBoundingClientRect();
+            var wrapRect = document.getElementById('imgWrapper').getBoundingClientRect();
+            var offX = imgRect.left - wrapRect.left;
+            var offY = imgRect.top - wrapRect.top;
+            var displayW = imgRect.width;
+            var displayH = imgRect.height;
+            var canvasRect = faceOverlayCanvas.getBoundingClientRect();
+            var clickX = e.clientX - canvasRect.left;
+            var clickY = e.clientY - canvasRect.top;
+            var imgXPct = (clickX - offX) / displayW * 100;
+            var imgYPct = (clickY - offY) / displayH * 100;
+            return { x: Math.max(0, Math.min(100, Math.round(imgXPct))),
+                     y: Math.max(0, Math.min(100, Math.round(imgYPct))) };
+        }
+
+        function hitTestNodes(e) {
+            var imgRect = sourceImage.getBoundingClientRect();
+            var wrapRect = document.getElementById('imgWrapper').getBoundingClientRect();
+            var offX = imgRect.left - wrapRect.left;
+            var offY = imgRect.top - wrapRect.top;
+            var natW = sourceImage.naturalWidth || 1;
+            var natH = sourceImage.naturalHeight || 1;
+            var sx = imgRect.width / natW;
+            var sy = imgRect.height / natH;
+            var canvasRect = faceOverlayCanvas.getBoundingClientRect();
+            var clickX = e.clientX - canvasRect.left;
+            var clickY = e.clientY - canvasRect.top;
+            var threshold = 12;
+            for (var i = 0; i < PARAMS.forceNodes.length; i++) {
+                var n = PARAMS.forceNodes[i];
+                var ncx = offX + (n.x / 100) * natW * sx;
+                var ncy = offY + (n.y / 100) * natH * sy;
+                var d = Math.sqrt((clickX - ncx) * (clickX - ncx) + (clickY - ncy) * (clickY - ncy));
+                if (d < threshold) return i;
+            }
+            return -1;
+        }
+
+        faceOverlayCanvas.addEventListener('pointerdown', function(e) {
+            if (placeMode) {
+                // Place mode: add node at click position
+                var pos = overlayToImagePercent(e);
+                var newNode = makeForceNode(placeMode);
+                newNode.x = pos.x;
+                newNode.y = pos.y;
+                PARAMS.forceNodes.push(newNode);
+                rebuildForceNodeUI();
+                drawFaceOverlay();
+                MONITOR.status = 'Placed ' + placeMode + ' node at ' + pos.x + '%, ' + pos.y + '%';
+                return;
+            }
+            // Drag mode: check if clicking a node center
+            var idx = hitTestNodes(e);
+            if (idx >= 0) {
+                dragNodeIdx = idx;
+                isDragging = true;
+                faceOverlayCanvas.style.cursor = 'grabbing';
+                e.preventDefault();
+            }
+        });
+
+        faceOverlayCanvas.addEventListener('pointermove', function(e) {
+            if (isDragging && dragNodeIdx >= 0) {
+                var pos = overlayToImagePercent(e);
+                PARAMS.forceNodes[dragNodeIdx].x = pos.x;
+                PARAMS.forceNodes[dragNodeIdx].y = pos.y;
+                drawFaceOverlay();
+                e.preventDefault();
+            } else if (!placeMode) {
+                // Show grab cursor when hovering near a node center
+                var idx = hitTestNodes(e);
+                faceOverlayCanvas.style.cursor = idx >= 0 ? 'grab' : '';
+                if (idx >= 0 && !faceOverlayCanvas.style.pointerEvents) {
+                    // Enable pointer events for drag if nodes exist
+                }
+            }
+        });
+
+        faceOverlayCanvas.addEventListener('pointerup', function(e) {
+            if (isDragging) {
+                isDragging = false;
+                faceOverlayCanvas.style.cursor = placeMode ? 'crosshair' : '';
+                dragNodeIdx = -1;
+                pane.refresh();
+            }
+        });
+
+        // Enable pointer events on overlay when force nodes exist (for drag)
+        var origDrawFaceOverlay = drawFaceOverlay;
+        drawFaceOverlay = function() {
+            origDrawFaceOverlay();
+            // Enable pointer events for drag when nodes exist and not in place mode
+            if (!placeMode && PARAMS.forceNodes.length > 0) {
+                faceOverlayCanvas.style.pointerEvents = 'auto';
+            } else if (!placeMode) {
+                faceOverlayCanvas.style.pointerEvents = 'none';
+            }
+        };
+
+        // -- Auto-Arrange --
+        forceNodesFolder.addSeparator();
+        var arrangeFolder = forceNodesFolder.addFolder({ title: 'Auto-Arrange', expanded: false });
+        arrangeFolder.addBinding(PARAMS, 'arrangeCount', { label: 'Count', min: 2, max: 20, step: 1 });
+        arrangeFolder.addBinding(PARAMS, 'arrangePattern', {
+            label: 'Pattern', options: { Ring: 'ring', 'Golden Spiral': 'golden', Grid: 'grid', 'Hex Grid': 'hex' }
+        });
+        arrangeFolder.addBinding(PARAMS, 'arrangeType', {
+            label: 'Type', options: { 'All Gravity': 'gravity', 'All Repulsion': 'repulsion', 'All Vortex': 'vortex', 'Alternating G/R': 'alternate' }
+        });
+        arrangeFolder.addBinding(PARAMS, 'arrangeRadius', { label: 'Radius %', min: 5, max: 50, step: 1 });
+        arrangeFolder.addButton({ title: 'Generate' }).on('click', function() {
+            var n = PARAMS.arrangeCount;
+            var pattern = PARAMS.arrangePattern;
+            var typeMode = PARAMS.arrangeType;
+            var radius = PARAMS.arrangeRadius;
+            PARAMS.forceNodes = [];
+            var positions = [];
+            var cx = 50, cy = 50;
+            var PHI = (1 + Math.sqrt(5)) / 2;
+            var GOLDEN_ANGLE = 2 * Math.PI / (PHI * PHI); // ~2.39996 rad
+
+            if (pattern === 'ring') {
+                for (var i = 0; i < n; i++) {
+                    var angle = 2 * Math.PI * i / n;
+                    positions.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) });
+                }
+            } else if (pattern === 'golden') {
+                for (var i = 0; i < n; i++) {
+                    var r = Math.sqrt(i / n) * radius;
+                    var angle = i * GOLDEN_ANGLE;
+                    positions.push({ x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) });
+                }
+            } else if (pattern === 'grid') {
+                var cols = Math.ceil(Math.sqrt(n));
+                var rows = Math.ceil(n / cols);
+                var spacingX = (radius * 2) / Math.max(cols - 1, 1);
+                var spacingY = (radius * 2) / Math.max(rows - 1, 1);
+                var startX = cx - radius;
+                var startY = cy - radius;
+                for (var i = 0; i < n; i++) {
+                    var col = i % cols;
+                    var row = Math.floor(i / cols);
+                    positions.push({ x: startX + col * spacingX, y: startY + row * spacingY });
+                }
+            } else if (pattern === 'hex') {
+                var cols = Math.ceil(Math.sqrt(n));
+                var rows = Math.ceil(n / cols);
+                var spacing = (radius * 2) / Math.max(cols - 1, 1);
+                var yStep = spacing * Math.sqrt(3) / 2;
+                var startX = cx - radius;
+                var startY = cy - (rows - 1) * yStep / 2;
+                for (var i = 0; i < n; i++) {
+                    var col = i % cols;
+                    var row = Math.floor(i / cols);
+                    var rowOffset = (row % 2) * spacing / 2;
+                    positions.push({ x: startX + col * spacing + rowOffset, y: startY + row * yStep });
+                }
+            }
+
+            positions.forEach(function(pos, i) {
+                var type;
+                if (typeMode === 'alternate') {
+                    type = i % 2 === 0 ? 'gravity' : 'repulsion';
+                } else {
+                    type = typeMode;
+                }
+                var node = makeForceNode(type);
+                node.x = Math.max(0, Math.min(100, Math.round(pos.x)));
+                node.y = Math.max(0, Math.min(100, Math.round(pos.y)));
+                PARAMS.forceNodes.push(node);
+            });
+            rebuildForceNodeUI();
+            drawFaceOverlay();
+            MONITOR.status = 'Arranged ' + n + ' nodes (' + pattern + ')';
+        });
+
+        // -- Tooltip descriptions --
+        var tips = {
+            pathFinderCount: 'Number of pathfinders exploring the image. More = denser coverage but slower.',
+            speed: 'Distance each pathfinder steps per frame. Higher = longer lines, faster exploration, less fine detail.',
+            lineWidth: 'Thickness of drawn lines. Higher = bolder strokes.',
+            turningAngle: 'Arc width scanned for the next pixel (×π radians). Higher = wider turns, more organic curving paths. Lower = straighter lines.',
+            sampleSize: 'Points sampled within the scanning arc. Higher = smoother direction choices, slightly slower.',
+            lineOpacity: 'Line transparency. Lower = subtler, more layered effect. Higher = solid vivid lines.',
+            jitter: 'Random wobble added to heading each frame. Higher = shakier, chaotic paths. Zero = smooth.',
+            edgeDetect: 'Blend between original image and edge-detected version. Higher = paths follow edges and contours more.',
+            alphaThreshold: 'Minimum pixel opacity to be traversable. Lower = paths enter semi-transparent areas.',
+            iterationLimit: 'Stop after this many steps (0 = unlimited). Use to capture a specific density.',
+            stepsPerFrame: 'Draw steps per animation frame. Higher = faster animation at same FPS. 1 = normal speed.',
+            seed: 'Fixed random seed for reproducible results. Empty = random each run.',
+            colorMode: 'Color preserves RGB channels from the image. Greyscale converts to luminance.',
+            key: 'Low = pathfinders seek dark pixels. High = pathfinders seek bright pixels.',
+            lineMode: 'Smooth = curved Bezier lines. Square = straight segments. Point = dots at each step. Pixel Grid = mosaic of color-averaged squares.',
+            pixelSize: 'Size of each pixel grid cell (2-50px). Smaller = more detail, larger = chunkier mosaic.',
+            compositeOperation: 'How new strokes blend with existing ones. Lighten brightens, Multiply darkens, Screen adds light.',
+            outputSize: 'Container = fit to panel. Original = native image resolution (may be large).',
+            backgroundColor: 'Canvas background color (visible with non-zero BG Alpha).',
+            backgroundAlpha: 'Background opacity. 0 = transparent (black). Higher = more visible background color.',
+            originBottom: 'Spawn pathfinders along the bottom edge, moving upward.',
+            originTop: 'Spawn pathfinders along the top edge, moving downward.',
+            originLeft: 'Spawn pathfinders along the left edge, moving right.',
+            originRight: 'Spawn pathfinders along the right edge, moving left.',
+            customOrigin: 'Custom origins: "center", "top-left", "bottom-right", or "X% Y%" coordinates. Comma-separated for multiple.',
+            radialEnabled: 'Master toggle for radial navigation bias. When on, pathfinders orbit in circles.',
+            radialStrength: 'How tightly paths follow the circle. Higher = tighter orbits. Lower = loose, organic curves.',
+            radialRadius: 'Target circle size (% of half the smaller dimension). Higher = larger orbit.',
+            radialCW: 'Portion going clockwise. 100 = all CW, 0 = all CCW, 50 = mixed swirl.',
+            radialPercent: 'Portion of pathfinders affected by radial bias. Lower = more paths ignore the circle.',
+            radialCenterX: 'Horizontal position of the orbit center. 0 = left edge, 100 = right edge.',
+            radialCenterY: 'Vertical position of the orbit center. 0 = top edge, 100 = bottom edge.',
+            radialDrift: 'Spiral tightening speed. 0 = fixed orbit. Higher = pathfinders spiral inward faster.',
+            radialDriftSpread: 'How much drift varies between pathfinders. 100 = full gradient (some fast, some slow). 0 = all spiral at same rate.',
+            radialOnConverge: 'What happens when a pathfinder reaches the inner limit. Stick = orbit there. Pulse = bounce back outward. Explode = break free.',
+            radialMinRadius: 'Inner circle boundary (% of half the smaller dimension) that triggers convergence behavior.',
+            focusEnabled: 'Enable face-aware pathfinding. Pathfinders spawn at facial landmarks, with gravity pulling them toward face features.',
+            focusPercent: 'Portion of pathfinders spawned at face landmarks vs edges. Higher = more pathfinders start on the face.',
+            faceGravity: 'Attraction strength toward facial landmarks. Higher = pathfinders orbit around eyes, trace jawlines, follow lips.',
+            focusX: 'Manual override: horizontal center of the focus rectangle (% of image width).',
+            focusY: 'Manual override: vertical center of the focus rectangle (% of image height).',
+            focusWidth: 'Manual override: width of the focus rectangle (% of image width).',
+            focusHeight: 'Manual override: height of the focus rectangle (% of image height).',
+            forceNodeType: 'Gravity attracts, Repulsion pushes away, Vortex orbits tangentially, Directional pushes in a fixed compass direction.',
+            forceNodeRadius: 'Size of the force field (% of half the smaller image dimension).',
+            forceNodeStrength: 'How strongly the field steers pathfinders. Higher = tighter pull/push.',
+            forceNodeRing: 'Hollows out the center to create a donut. 0 = solid disc, 95 = thin ring.',
+            forceNodeFalloff: 'How far the force extends beyond the node edge. Higher = broader reach.',
+            forceNodeDirection: 'Vortex: 0=CW, 180=CCW. Directional: compass heading in degrees (0=right, 90=down, 180=left, 270=up).',
+            forceNodeOrbit: 'Orbit radius (% of half min dimension). Node center moves in a circle. 0 = stationary.',
+            forceNodeOrbitSpeed: 'Orbit angular speed (%). Higher = faster revolution.',
+            forceNodePulse: 'Pulse frequency in Hz. Strength oscillates sinusoidally. 0 = constant strength.',
+            forceNodeBrightness: 'Brightness modulation: Off = constant force, Bright = stronger over bright pixels, Dark = stronger over dark pixels.',
+            audioEnabled: 'Feed a live spectrogram to pathfinders. Audio becomes the image — pathfinders trace the shape of sound.',
+            audioGain: 'Amplify audio signal. Higher = brighter spectrogram, more vivid pathfinder colors.',
+            audioColorMap: 'Frequency Hue: red=bass, green=mids, blue=treble (emergent channel separation). Grayscale: amplitude only. Heat: Winamp-style plasma.',
+            audioSmoothing: 'Temporal smoothing between frames. Higher = smoother transitions, less flickering. Lower = more responsive to transients.',
+            audioFftSize: 'FFT window size. Higher = more frequency resolution but slower response. 2048 is a good balance.',
+            audioRefreshRate: 'Frames between pixelData updates. Lower = more responsive but heavier on CPU. 4 = good balance.',
+            audioLogScale: 'Log scale spreads bass across more pixels (musical). Linear distributes frequencies evenly (scientific).',
+            audioShowSpectrogram: 'Overlay the raw spectrogram on the canvas for debugging.',
+            audioSource: 'Microphone for live input, or load an audio file for playback.'
+        };
+        // Attach tips by querying each binding's DOM element
+        (function() {
+            var allBlades = pane.element.querySelectorAll('.tp-lblv');
+            allBlades.forEach(function(el) {
+                var labelEl = el.querySelector('.tp-lblv_l');
+                if (!labelEl) return;
+                var labelText = labelEl.textContent.trim();
+                var keyMap = {
+                    'Count': 'pathFinderCount', 'speed': 'speed', 'Width': 'lineWidth',
+                    'Angle (xPi)': 'turningAngle', 'Sample': 'sampleSize', 'Opacity %': 'lineOpacity',
+                    'Jitter %': 'jitter', 'Edges %': 'edgeDetect', 'Alpha': 'alphaThreshold',
+                    'Limit': 'iterationLimit', 'Steps/Frame': 'stepsPerFrame', 'Seed': 'seed',
+                    'Color': 'colorMode', 'key': 'key', 'Line': 'lineMode', 'Pixel Size': 'pixelSize',
+                    'Blend': 'compositeOperation', 'Size': 'outputSize',
+                    'BG Color': 'backgroundColor', 'BG Alpha %': 'backgroundAlpha',
+                    'Bottom': 'originBottom', 'Top': 'originTop', 'Left': 'originLeft',
+                    'Right': 'originRight', 'Custom': 'customOrigin',
+                    'Enable': 'radialEnabled', 'Strength %': 'radialStrength',
+                    'Radius %': 'radialRadius', 'CW %': 'radialCW', 'Bound %': 'radialPercent',
+                    'Center X %': 'radialCenterX', 'Center Y %': 'radialCenterY',
+                    'Drift': 'radialDrift', 'Drift Spread': 'radialDriftSpread',
+                    'On Converge': 'radialOnConverge', 'Min Radius %': 'radialMinRadius',
+                    'Focus': 'focusEnabled', 'Gravity %': 'faceGravity',
+                    'Focus X %': 'focusX', 'Focus Y %': 'focusY',
+                    'Width %': 'focusWidth', 'Height %': 'focusHeight', 'Density %': 'focusPercent'
+                };
+                var paramKey = keyMap[labelText];
+                if (paramKey && tips[paramKey]) {
+                    el.setAttribute('data-tip', tips[paramKey]);
+                }
+            });
+        })();
+
+        // -- Regions (semantic detection) --
+        const regionsFolder = pane.addFolder({ title: 'Regions', expanded: false });
+        regionsFolder.addButton({ title: 'Detect Regions' }).on('click', function() { detectRegions(); });
+        var REGION_MONITOR = { detected: 'None' };
+        regionsFolder.addBinding(REGION_MONITOR, 'detected', { readonly: true, label: 'Detected', interval: 500 });
+        var regionEnableObj = { enabled: false };
+        regionsFolder.addBinding(regionEnableObj, 'enabled', { label: 'Enable Profiles' }).on('change', function(ev) {
+            regionProfilesEnabled = ev.value;
+        });
+        regionsFolder.addButton({ title: 'Clear Regions' }).on('click', function() {
+            regionMask = null;
+            regionStats = {};
+            regionProfiles = {};
+            regionProfilesEnabled = false;
+            regionEnableObj.enabled = false;
+            REGION_MONITOR.detected = 'None';
+            pane.refresh();
+            rebuildRegionProfileUI();
+            MONITOR.status = 'Regions cleared';
+        });
+        var regionProfileSubfolders = [];
+
+        function rebuildRegionProfileUI() {
+            regionProfileSubfolders.forEach(function(f) { f.dispose(); });
+            regionProfileSubfolders = [];
+            if (!regionStats || Object.keys(regionStats).length === 0) return;
+
+            for (var gi = 0; gi < REGION_GROUP_NAMES.length; gi++) {
+                var groupName = REGION_GROUP_NAMES[gi];
+                if (!regionStats[groupName]) continue;
+
+                (function(gName, gIdx) {
+                    if (!regionProfiles[gIdx]) {
+                        regionProfiles[gIdx] = {
+                            speedOverride: false, speed: PARAMS.speed,
+                            lineWidthOverride: false, lineWidth: PARAMS.lineWidth,
+                            jitterOverride: false, jitter: PARAMS.jitter,
+                            turningAngleOverride: false, turningAngle: PARAMS.turningAngle,
+                            opacityOverride: false, lineOpacity: PARAMS.lineOpacity
+                        };
+                    }
+                    var prof = regionProfiles[gIdx];
+                    var f = regionsFolder.addFolder({ title: gName + ' (' + regionStats[gName] + '%)', expanded: false });
+                    regionProfileSubfolders.push(f);
+
+                    f.addBinding(prof, 'speedOverride', { label: 'Speed' });
+                    f.addBinding(prof, 'speed', { label: 'Val', min: 1, max: 100, step: 1 });
+                    f.addBinding(prof, 'lineWidthOverride', { label: 'Width' });
+                    f.addBinding(prof, 'lineWidth', { label: 'Val', min: 0.5, max: 100, step: 0.5 });
+                    f.addBinding(prof, 'jitterOverride', { label: 'Jitter' });
+                    f.addBinding(prof, 'jitter', { label: 'Val', min: 0, max: 100, step: 0.5 });
+                    f.addBinding(prof, 'turningAngleOverride', { label: 'Angle' });
+                    f.addBinding(prof, 'turningAngle', { label: 'Val', min: 0.01, max: 3, step: 0.01 });
+                    f.addBinding(prof, 'opacityOverride', { label: 'Opacity' });
+                    f.addBinding(prof, 'lineOpacity', { label: 'Val', min: 1, max: 100, step: 0.5 });
+                })(groupName, gi);
+            }
+        }
+
+        // -- Parameter Ranges (per-pathfinder variation) --
+        const rangesFolder = pane.addFolder({ title: 'Parameter Ranges', expanded: false });
+        var rangeSubfolders = [];
+        var RANGE_PARAM_LABELS = {
+            speed: 'Speed', lineWidth: 'Width', turningAngle: 'Angle',
+            jitter: 'Jitter', lineOpacity: 'Opacity', sampleSize: 'Sample',
+            radialStrength: 'Rad Strength', radialRadius: 'Rad Radius'
+        };
+        Object.keys(RANGES).forEach(function(param) {
+            var r = RANGES[param];
+            var f = rangesFolder.addFolder({ title: RANGE_PARAM_LABELS[param] || param, expanded: false });
+            rangeSubfolders.push(f);
+            f.addBinding(r, 'enabled', { label: 'Range' });
+            f.addBinding(r, 'min', { label: 'Min', min: param === 'lineWidth' ? 0.5 : (param === 'turningAngle' ? 0.01 : (param === 'sampleSize' ? 2 : 0)), max: param === 'lineWidth' ? 100 : (param === 'turningAngle' ? 3 : (param === 'speed' ? 100 : (param === 'sampleSize' ? 64 : 100))), step: param === 'lineWidth' ? 0.5 : (param === 'turningAngle' ? 0.01 : (param === 'sampleSize' ? 1 : 1)) });
+            f.addBinding(r, 'max', { label: 'Max', min: param === 'lineWidth' ? 0.5 : (param === 'turningAngle' ? 0.01 : (param === 'sampleSize' ? 2 : 0)), max: param === 'lineWidth' ? 100 : (param === 'turningAngle' ? 3 : (param === 'speed' ? 100 : (param === 'sampleSize' ? 64 : 100))), step: param === 'lineWidth' ? 0.5 : (param === 'turningAngle' ? 0.01 : (param === 'sampleSize' ? 1 : 1)) });
+        });
+
+        // -- Modulators --
+        const modulatorsFolder = pane.addFolder({ title: 'Modulators', expanded: false });
+        var modSubfolders = [];
+        var MOD_PARAMS = ['speed', 'lineWidth', 'turningAngle', 'lineOpacity', 'jitter', 'sampleSize', 'radialStrength', 'radialRadius', 'mathStrength'];
+        var MOD_PARAM_OPTIONS = {};
+        MOD_PARAMS.forEach(function(p) { MOD_PARAM_OPTIONS[p.charAt(0).toUpperCase() + p.slice(1).replace(/([A-Z])/g, ' $1')] = p; });
+        var MOD_WAVE_OPTIONS = { Sine: 'sine', Triangle: 'triangle', Sawtooth: 'sawtooth', Square: 'square', Random: 'random' };
+
+        modulatorsFolder.addButton({ title: 'Add Modulator' }).on('click', function() {
+            if (MODULATORS.length >= 8) { MONITOR.status = 'Max 8 modulators'; return; }
+            MODULATORS.push({ param: 'speed', waveform: 'sine', period: 500, min: 1, max: 50, phase: 0, enabled: true });
+            rebuildModulatorUI();
+        });
+
+        function rebuildModulatorUI() {
+            modSubfolders.forEach(function(f) { f.dispose(); });
+            modSubfolders = [];
+            MODULATORS.forEach(function(m, idx) {
+                var f = modulatorsFolder.addFolder({ title: (idx + 1) + '. ' + m.param + ' (' + m.waveform + ')', expanded: true });
+                modSubfolders.push(f);
+                f.addBinding(m, 'param', { label: 'Param', options: MOD_PARAM_OPTIONS }).on('change', function() { rebuildModulatorUI(); });
+                f.addBinding(m, 'waveform', { label: 'Wave', options: MOD_WAVE_OPTIONS }).on('change', function() { rebuildModulatorUI(); });
+                f.addBinding(m, 'period', { label: 'Period', min: 10, max: 10000, step: 10 });
+                f.addBinding(m, 'min', { label: 'Min', min: 0, max: 100, step: 0.5 });
+                f.addBinding(m, 'max', { label: 'Max', min: 0, max: 100, step: 0.5 });
+                f.addBinding(m, 'phase', { label: 'Phase', min: 0, max: 1, step: 0.01 });
+                f.addBinding(m, 'enabled', { label: 'Enable' });
+                f.addButton({ title: 'Delete' }).on('click', function() {
+                    MODULATORS.splice(idx, 1);
+                    rebuildModulatorUI();
+                });
+            });
+        }
+
+        // -- Natural Math --
+        const mathFolder = pane.addFolder({ title: 'Natural Math', expanded: false });
+        var MATH_MODE_OPTIONS = {
+            'None': 'none',
+            'Fibonacci Spiral': 'fibonacci',
+            'Euler Spiral': 'euler',
+            'Lissajous': 'lissajous',
+            'Lorenz Attractor': 'lorenz',
+            'Flow Field': 'flowfield',
+            'Boids Flocking': 'boids',
+            'L-System Branch': 'lsystem'
+        };
+        mathFolder.addBinding(PARAMS, 'mathMode', { label: 'Mode', options: MATH_MODE_OPTIONS });
+        mathFolder.addBinding(PARAMS, 'mathStrength', { label: 'Strength', min: 0, max: 100, step: 1 });
+        mathFolder.addBinding(PARAMS, 'mathCenterX', { label: 'Center X %', min: 0, max: 100, step: 1 });
+        mathFolder.addBinding(PARAMS, 'mathCenterY', { label: 'Center Y %', min: 0, max: 100, step: 1 });
+
+        // Mode-specific controls with show/hide
+        var mathEulerFolder = mathFolder.addFolder({ title: 'Euler', expanded: true });
+        var mathEulerRate = mathEulerFolder.addBinding(PARAMS, 'mathCurvatureRate', { label: 'Curvature Rate', min: 1, max: 100, step: 1 });
+        var mathEulerMax = mathEulerFolder.addBinding(PARAMS, 'mathCurvatureMax', { label: 'Curvature Max', min: 1, max: 100, step: 1 });
+
+        var mathLissFolder = mathFolder.addFolder({ title: 'Lissajous', expanded: true });
+        mathLissFolder.addBinding(PARAMS, 'mathFreqX', { label: 'Freq X', min: 1, max: 8, step: 1 });
+        mathLissFolder.addBinding(PARAMS, 'mathFreqY', { label: 'Freq Y', min: 1, max: 8, step: 1 });
+        mathLissFolder.addBinding(PARAMS, 'mathLissRate', { label: 'Rate', min: 1, max: 100, step: 1 });
+
+        var mathLorenzFolder = mathFolder.addFolder({ title: 'Lorenz', expanded: true });
+        mathLorenzFolder.addBinding(PARAMS, 'mathLorenzChaos', { label: 'Chaos (rho)', min: 1, max: 100, step: 1 });
+        mathLorenzFolder.addBinding(PARAMS, 'mathLorenzDt', { label: 'Time Step', min: 1, max: 100, step: 1 });
+
+        var mathFlowFolder = mathFolder.addFolder({ title: 'Flow Field', expanded: true });
+        mathFlowFolder.addBinding(PARAMS, 'mathFlowScale', { label: 'Scale', min: 1, max: 100, step: 1 });
+        mathFlowFolder.addBinding(PARAMS, 'mathFlowEvolution', { label: 'Evolution', min: 0, max: 100, step: 1 });
+        mathFlowFolder.addBinding(PARAMS, 'mathFlowOctaves', { label: 'Octaves', min: 1, max: 4, step: 1 });
+
+        var mathBoidsFolder = mathFolder.addFolder({ title: 'Boids', expanded: true });
+        mathBoidsFolder.addBinding(PARAMS, 'mathSeparation', { label: 'Separation', min: 0, max: 100, step: 1 });
+        mathBoidsFolder.addBinding(PARAMS, 'mathAlignment', { label: 'Alignment', min: 0, max: 100, step: 1 });
+        mathBoidsFolder.addBinding(PARAMS, 'mathCohesion', { label: 'Cohesion', min: 0, max: 100, step: 1 });
+        mathBoidsFolder.addBinding(PARAMS, 'mathPerception', { label: 'Perception', min: 1, max: 100, step: 1 });
+
+        var mathLSysFolder = mathFolder.addFolder({ title: 'L-System', expanded: true });
+        mathLSysFolder.addBinding(PARAMS, 'mathBranchInterval', { label: 'Branch Interval', min: 10, max: 200, step: 1 });
+        mathLSysFolder.addBinding(PARAMS, 'mathBranchAngle', { label: 'Branch Angle °', min: 1, max: 90, step: 1 });
+        mathLSysFolder.addBinding(PARAMS, 'mathGenerations', { label: 'Generations', min: 1, max: 6, step: 1 });
+
+        function updateMathFolderVisibility() {
+            var mode = PARAMS.mathMode;
+            mathEulerFolder.element.style.display = mode === 'euler' ? '' : 'none';
+            mathLissFolder.element.style.display = mode === 'lissajous' ? '' : 'none';
+            mathLorenzFolder.element.style.display = mode === 'lorenz' ? '' : 'none';
+            mathFlowFolder.element.style.display = mode === 'flowfield' ? '' : 'none';
+            mathBoidsFolder.element.style.display = mode === 'boids' ? '' : 'none';
+            mathLSysFolder.element.style.display = mode === 'lsystem' ? '' : 'none';
+        }
+        updateMathFolderVisibility();
+        mathFolder.on('change', function() { updateMathFolderVisibility(); });
+
+        // -- Audio Input --
+        const audioFolder = pane.addFolder({ title: 'Audio Input', expanded: false });
+        audioFolder.addBinding(PARAMS, 'audioEnabled', { label: 'Enable' }).on('change', function(ev) {
+            if (ev.value) {
+                // Auto-create blank canvas if no image loaded
+                if (!sourceImage.src || sourceImage.classList.contains('hidden')) {
+                    var blankCanvas = document.createElement('canvas');
+                    blankCanvas.width = 800;
+                    blankCanvas.height = 600;
+                    var bctx = blankCanvas.getContext('2d');
+                    bctx.fillStyle = '#000';
+                    bctx.fillRect(0, 0, 800, 600);
+                    sourceImage.src = blankCanvas.toDataURL();
+                    sourceImage.onload = function() {
+                        sourceImage.classList.remove('hidden');
+                        MONITOR.status = 'Blank canvas created for audio';
+                        initAudio();
+                    };
+                    return;
+                }
+                initAudio();
+            } else {
+                stopAudio();
+            }
+        });
+        audioFolder.addBinding(PARAMS, 'audioSource', {
+            label: 'Source', options: { Microphone: 'mic', 'Audio File': 'file' }
+        }).on('change', function(ev) {
+            audioFilePickerEl.style.display = ev.value === 'file' ? '' : 'none';
+            if (PARAMS.audioEnabled) { stopAudio(); initAudio(); }
+        });
+        var audioFilePickerEl = document.createElement('div');
+        audioFilePickerEl.style.cssText = 'padding:4px 8px;display:none';
+        audioFilePickerEl.innerHTML = '<input type="file" accept="audio/*" style="font-size:11px;color:#aaa;width:100%">';
+        audioFolder.element.appendChild(audioFilePickerEl);
+        audioFilePickerEl.querySelector('input').addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+            if (audioFileElement) { audioFileElement.pause(); audioFileElement.remove(); }
+            audioFileElement = document.createElement('audio');
+            audioFileElement.src = URL.createObjectURL(file);
+            audioFileElement.crossOrigin = 'anonymous';
+            audioFileElement.loop = true;
+            MONITOR.status = 'Audio file loaded: ' + file.name;
+            if (PARAMS.audioEnabled) { stopAudio(); initAudio(); audioFileElement.play(); }
+        });
+        audioFolder.addBinding(PARAMS, 'audioGain', { label: 'Gain', min: 1, max: 300, step: 1 }).on('change', function() {
+            if (audioGainNode) audioGainNode.gain.value = PARAMS.audioGain / 100;
+        });
+        audioFolder.addBinding(PARAMS, 'audioColorMap', {
+            label: 'Color Map', options: { 'Frequency Hue': 'frequency', Grayscale: 'grayscale', Heat: 'heat' }
+        });
+        audioFolder.addBinding(PARAMS, 'audioSmoothing', { label: 'Smoothing', min: 0, max: 99, step: 1 }).on('change', function() {
+            if (audioAnalyser) audioAnalyser.smoothingTimeConstant = PARAMS.audioSmoothing / 100;
+        });
+        audioFolder.addBinding(PARAMS, 'audioFftSize', {
+            label: 'FFT Size', options: { '512': 512, '1024': 1024, '2048': 2048, '4096': 4096 }
+        }).on('change', function() {
+            if (PARAMS.audioEnabled) { stopAudio(); initAudio(); }
+        });
+        audioFolder.addBinding(PARAMS, 'audioRefreshRate', { label: 'Refresh Rate', min: 1, max: 30, step: 1 });
+        audioFolder.addBinding(PARAMS, 'audioLogScale', { label: 'Log Scale' });
+        audioFolder.addBinding(PARAMS, 'audioShowSpectrogram', { label: 'Show Spectrogram' }).on('change', function(ev) {
+            var specCanvas = document.getElementById('spectrogramCanvas');
+            if (ev.value) {
+                if (!specCanvas) {
+                    specCanvas = document.createElement('canvas');
+                    specCanvas.id = 'spectrogramCanvas';
+                    specCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;opacity:0.4;pointer-events:none;z-index:5';
+                    document.getElementById('imgWrapper').appendChild(specCanvas);
+                }
+                specCanvas.style.display = '';
+            } else if (specCanvas) {
+                specCanvas.style.display = 'none';
+            }
+        });
+
+        // -- Export --
+        const exportFolder = pane.addFolder({ title: 'Export', expanded: false });
+        exportFolder.addButton({ title: 'Save PNG' }).on('click', savePNG);
+        exportFolder.addButton({ title: 'Record WebM' }).on('click', toggleRecording);
+        exportFolder.addButton({ title: 'Export SVG' }).on('click', exportSVG);
+
+        // -- Monitor --
+        const monitorFolder = pane.addFolder({ title: 'Monitor', expanded: true });
+        monitorFolder.addBinding(MONITOR, 'fps', { readonly: true, interval: 300 });
+        monitorFolder.addBinding(MONITOR, 'iterations', { readonly: true, interval: 300 });
+        monitorFolder.addBinding(MONITOR, 'pathfinders', { readonly: true, interval: 500 });
+        monitorFolder.addBinding(MONITOR, 'coverage', { readonly: true, label: 'coverage %', interval: 300 });
+
+        // ============ OPTIONS BUILDER ============
+        function hexToRgba(hex, alpha) {
+            var r = parseInt(hex.slice(1, 3), 16);
+            var g = parseInt(hex.slice(3, 5), 16);
+            var b = parseInt(hex.slice(5, 7), 16);
+            return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+        }
+
+        function getOptions() {
+            var origins = [];
+            if (PARAMS.originBottom) origins.push('bottom');
+            if (PARAMS.originTop) origins.push('top');
+            if (PARAMS.originLeft) origins.push('left');
+            if (PARAMS.originRight) origins.push('right');
+            var custom = PARAMS.customOrigin.trim();
+            if (custom) {
+                origins = origins.concat(custom.split(',').map(function(s) { return s.trim(); }).filter(Boolean));
+            }
+            if (origins.length === 0) origins = ['bottom'];
+
+            return {
+                colorMode: PARAMS.colorMode,
+                compositeOperation: PARAMS.compositeOperation,
+                key: PARAMS.key,
+                lineMode: PARAMS.lineMode,
+                lineWidth: PARAMS.lineWidth,
+                pixelSize: PARAMS.pixelSize,
+                lineOpacity: PARAMS.lineOpacity / 100,
+                outputSize: PARAMS.outputSize,
+                pathFinderCount: PARAMS.pathFinderCount,
+                speed: PARAMS.speed,
+                turningAngle: PARAMS.turningAngle * Math.PI,
+                sampleSize: PARAMS.sampleSize,
+                jitter: PARAMS.jitter / 50,
+                edgeDetect: PARAMS.edgeDetect / 100,
+                alphaThreshold: PARAMS.alphaThreshold,
+                iterationLimit: PARAMS.iterationLimit,
+                stepsPerFrame: PARAMS.stepsPerFrame,
+                seed: PARAMS.seed.trim() ? parseInt(PARAMS.seed) : null,
+                origin: origins,
+                backgroundColor: hexToRgba(PARAMS.backgroundColor, PARAMS.backgroundAlpha / 100),
+                radialEnabled: PARAMS.radialEnabled,
+                radialStrength: PARAMS.radialStrength / 100,
+                radialRadius: PARAMS.radialRadius,
+                radialCW: PARAMS.radialCW,
+                radialPercent: PARAMS.radialPercent,
+                radialCenterX: PARAMS.radialCenterX,
+                radialCenterY: PARAMS.radialCenterY,
+                radialDrift: PARAMS.radialDrift,
+                radialDriftSpread: PARAMS.radialDriftSpread,
+                radialOnConverge: PARAMS.radialOnConverge,
+                radialMinRadius: PARAMS.radialMinRadius,
+                mathMode: PARAMS.mathMode,
+                mathStrength: PARAMS.mathStrength,
+                mathCenterX: PARAMS.mathCenterX,
+                mathCenterY: PARAMS.mathCenterY,
+                mathCurvatureRate: PARAMS.mathCurvatureRate,
+                mathCurvatureMax: PARAMS.mathCurvatureMax,
+                mathFreqX: PARAMS.mathFreqX,
+                mathFreqY: PARAMS.mathFreqY,
+                mathLissRate: PARAMS.mathLissRate,
+                mathLorenzChaos: PARAMS.mathLorenzChaos,
+                mathLorenzDt: PARAMS.mathLorenzDt,
+                mathFlowScale: PARAMS.mathFlowScale,
+                mathFlowEvolution: PARAMS.mathFlowEvolution,
+                mathFlowOctaves: PARAMS.mathFlowOctaves,
+                mathSeparation: PARAMS.mathSeparation,
+                mathAlignment: PARAMS.mathAlignment,
+                mathCohesion: PARAMS.mathCohesion,
+                mathPerception: PARAMS.mathPerception,
+                mathBranchInterval: PARAMS.mathBranchInterval,
+                mathBranchAngle: PARAMS.mathBranchAngle,
+                mathGenerations: PARAMS.mathGenerations,
+                focusEnabled: PARAMS.focusEnabled,
+                focusX: PARAMS.focusX,
+                focusY: PARAMS.focusY,
+                focusWidth: PARAMS.focusWidth,
+                focusHeight: PARAMS.focusHeight,
+                focusPercent: PARAMS.focusPercent,
+                focusRegions: detectedFaces.length > 0 ? detectedFaces.slice() : [],
+                faceLandmarks: detectedFaces.filter(function(f) { return f.landmarks; }).map(function(f) { return f.landmarks; }),
+                faceGravityStrength: PARAMS.faceGravity / 100,
+                forceNodes: PARAMS.forceNodes.map(function(n) {
+                    return { type: n.type, x: n.x, y: n.y, radius: n.radius,
+                             strength: n.strength / 100, ring: n.ring / 100, falloff: n.falloff / 100,
+                             direction: n.direction || 0, orbit: n.orbit || 0,
+                             orbitSpeed: n.orbitSpeed || 10, pulse: n.pulse || 0,
+                             brightnessMode: n.brightnessMode || 'off' };
+                }),
+                ranges: (function() {
+                    var active = {};
+                    var anyActive = false;
+                    for (var p in RANGES) {
+                        if (RANGES[p].enabled) {
+                            active[p] = { min: RANGES[p].min, max: RANGES[p].max };
+                            anyActive = true;
+                        }
+                    }
+                    return anyActive ? active : null;
+                })(),
+                regionMask: regionProfilesEnabled && regionMask ? regionMask : null,
+                regionMaskWidth: sourceImage.naturalWidth,
+                regionProfiles: regionProfilesEnabled ? (function() {
+                    var rp = {};
+                    for (var gi in regionProfiles) {
+                        var p = regionProfiles[gi];
+                        var overrides = {};
+                        var hasAny = false;
+                        if (p.speedOverride) { overrides.speed = p.speed; hasAny = true; }
+                        if (p.lineWidthOverride) { overrides.lineWidth = p.lineWidth; hasAny = true; }
+                        if (p.jitterOverride) { overrides.jitter = p.jitter / 50; hasAny = true; }
+                        if (p.turningAngleOverride) { overrides.turningAngle = p.turningAngle * Math.PI; hasAny = true; }
+                        if (p.opacityOverride) { overrides.lineOpacity = p.lineOpacity / 100; hasAny = true; }
+                        if (hasAny) rp[gi] = overrides;
+                    }
+                    return Object.keys(rp).length > 0 ? rp : null;
+                })() : null
+            };
+        }
+
+        // ============ IMAGE LOADING ============
+        function loadImage(file) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                sourceImage.src = e.target.result;
+                sourceImage.onload = async function() {
+                    sourceImage.classList.remove('hidden');
+                    MONITOR.status = 'Image loaded';
+                    if (chromata) { chromata.reset(); chromata = null; }
+                    detectedFaces = [];
+                    FACE_MONITOR.detected = 'None';
+                    if (faceApiReady) {
+                        await detectFaces();
+                    }
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        dropZone.addEventListener('click', function() { imageInput.click(); });
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            var file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) loadImage(file);
+        });
+        imageInput.addEventListener('change', function(e) {
+            if (e.target.files[0]) loadImage(e.target.files[0]);
+        });
+
+        // ============ ACTIONS ============
+        function start() {
+            if (!sourceImage.src && !PARAMS.audioEnabled) { MONITOR.status = 'Load an image first'; return; }
+            // Auto-create blank canvas for audio-only mode
+            if (!sourceImage.src && PARAMS.audioEnabled) {
+                var blankCanvas = document.createElement('canvas');
+                blankCanvas.width = 800;
+                blankCanvas.height = 600;
+                var bctx = blankCanvas.getContext('2d');
+                bctx.fillStyle = '#000';
+                bctx.fillRect(0, 0, 800, 600);
+                sourceImage.src = blankCanvas.toDataURL();
+                sourceImage.onload = function() {
+                    sourceImage.classList.remove('hidden');
+                    start();
+                };
+                return;
+            }
+            if (chromata) chromata.reset();
+            chromata = new Chromata(sourceImage, getOptions());
+            chromata.start();
+            isRunning = true;
+            MONITOR.status = 'Running';
+            faceOverlayCanvas.classList.add('hidden');
+            // Start audio if enabled
+            if (PARAMS.audioEnabled && !audioAnalyser) {
+                setTimeout(function() { initAudio(); }, 200);
+            }
+        }
+
+        function toggle() {
+            if (!chromata) return;
+            chromata.toggle();
+            isRunning = !isRunning;
+            MONITOR.status = isRunning ? 'Running' : 'Paused';
+            if (isRunning) {
+                faceOverlayCanvas.classList.add('hidden');
+            } else {
+                drawFaceOverlay();
+            }
+        }
+
+        function reset() {
+            if (PARAMS.audioEnabled) stopAudio();
+            if (chromata) { chromata.reset(); chromata = null; }
+            isRunning = false;
+            MONITOR.status = 'Reset';
+            MONITOR.fps = 0;
+            MONITOR.iterations = 0;
+            MONITOR.pathfinders = 0;
+            sourceImage.classList.remove('hidden');
+            drawFaceOverlay();
+        }
+
+        // ============ EXPORT: PNG ============
+        function savePNG() {
+            var canvas = canvasContainer.querySelector('canvas');
+            if (!canvas) { MONITOR.status = 'No canvas to save'; return; }
+            var link = document.createElement('a');
+            link.download = 'chromata-' + Date.now() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            MONITOR.status = 'PNG saved';
+        }
+
+        // ============ EXPORT: VIDEO ============
+        function toggleRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                MONITOR.status = 'Encoding video...';
+                return;
+            }
+            var canvas = canvasContainer.querySelector('canvas');
+            if (!canvas) { MONITOR.status = 'Start animation first'; return; }
+
+            recordedChunks = [];
+            var stream = canvas.captureStream(30);
+            mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'video/webm;codecs=vp9',
+                videoBitsPerSecond: 8000000
+            });
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+            mediaRecorder.onstop = function() {
+                var blob = new Blob(recordedChunks, { type: 'video/webm' });
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement('a');
+                link.download = 'chromata-' + Date.now() + '.webm';
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+                MONITOR.status = 'Video saved';
+            };
+            mediaRecorder.start(100);
+            MONITOR.status = 'Recording...';
+        }
+
+        // ============ EXPORT: SVG ============
+        function exportSVG() {
+            if (!chromata) { MONITOR.status = 'Run animation first'; return; }
+            var svgString = chromata.exportSVG();
+            if (!svgString) { MONITOR.status = 'No paths recorded'; return; }
+            var blob = new Blob([svgString], { type: 'image/svg+xml' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.download = 'chromata-' + Date.now() + '.svg';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            MONITOR.status = 'SVG exported';
+        }
+
+        // ============ PRESETS: Built-in ============
+        function applyPreset(name) {
+            var p = presets[name];
+            if (!p) return;
+            PARAMS.colorMode = p.colorMode || 'color';
+            PARAMS.compositeOperation = p.compositeOperation || 'lighten';
+            PARAMS.key = p.key || 'low';
+            PARAMS.lineMode = p.lineMode || 'smooth';
+            PARAMS.lineWidth = p.lineWidth || 2;
+            PARAMS.pathFinderCount = p.pathFinderCount || 27;
+            PARAMS.speed = p.speed || 8;
+            PARAMS.turningAngle = p.turningAngle || 1;
+            PARAMS.pixelSize = p.pixelSize || 8;
+            pixelSizeBinding.element.style.display = PARAMS.lineMode === 'pixel-grid' ? '' : 'none';
+            var origins = p.origin || ['bottom'];
+            PARAMS.originBottom = origins.includes('bottom');
+            PARAMS.originTop = origins.includes('top');
+            PARAMS.originLeft = origins.includes('left');
+            PARAMS.originRight = origins.includes('right');
+            PARAMS.radialEnabled = p.radialEnabled || false;
+            PARAMS.radialStrength = p.radialStrength || 50;
+            PARAMS.radialRadius = p.radialRadius || 40;
+            PARAMS.radialCW = p.radialCW || 50;
+            PARAMS.radialPercent = p.radialPercent || 100;
+            PARAMS.radialCenterX = p.radialCenterX || 50;
+            PARAMS.radialCenterY = p.radialCenterY || 50;
+            PARAMS.radialDrift = p.radialDrift || 0;
+            PARAMS.radialDriftSpread = p.radialDriftSpread != null ? p.radialDriftSpread : 100;
+            PARAMS.radialOnConverge = p.radialOnConverge || 'stick';
+            PARAMS.radialMinRadius = p.radialMinRadius || 5;
+            PARAMS.focusEnabled = p.focusEnabled || false;
+            PARAMS.focusX = p.focusX || 50;
+            PARAMS.focusY = p.focusY || 40;
+            PARAMS.focusWidth = p.focusWidth || 30;
+            PARAMS.focusHeight = p.focusHeight || 30;
+            PARAMS.focusPercent = p.focusPercent || 50;
+            // Force nodes: deep copy if present, otherwise empty
+            PARAMS.forceNodes = p.forceNodes ? JSON.parse(JSON.stringify(p.forceNodes)) : [];
+            rebuildForceNodeUI();
+            // Math mode params
+            PARAMS.mathMode = p.mathMode || 'none';
+            PARAMS.mathStrength = p.mathStrength != null ? p.mathStrength : 50;
+            PARAMS.mathCenterX = p.mathCenterX != null ? p.mathCenterX : 50;
+            PARAMS.mathCenterY = p.mathCenterY != null ? p.mathCenterY : 50;
+            PARAMS.mathCurvatureRate = p.mathCurvatureRate != null ? p.mathCurvatureRate : 30;
+            PARAMS.mathCurvatureMax = p.mathCurvatureMax != null ? p.mathCurvatureMax : 50;
+            PARAMS.mathFreqX = p.mathFreqX != null ? p.mathFreqX : 3;
+            PARAMS.mathFreqY = p.mathFreqY != null ? p.mathFreqY : 2;
+            PARAMS.mathLissRate = p.mathLissRate != null ? p.mathLissRate : 50;
+            PARAMS.mathLorenzChaos = p.mathLorenzChaos != null ? p.mathLorenzChaos : 28;
+            PARAMS.mathLorenzDt = p.mathLorenzDt != null ? p.mathLorenzDt : 50;
+            PARAMS.mathFlowScale = p.mathFlowScale != null ? p.mathFlowScale : 30;
+            PARAMS.mathFlowEvolution = p.mathFlowEvolution != null ? p.mathFlowEvolution : 0;
+            PARAMS.mathFlowOctaves = p.mathFlowOctaves != null ? p.mathFlowOctaves : 1;
+            PARAMS.mathSeparation = p.mathSeparation != null ? p.mathSeparation : 70;
+            PARAMS.mathAlignment = p.mathAlignment != null ? p.mathAlignment : 50;
+            PARAMS.mathCohesion = p.mathCohesion != null ? p.mathCohesion : 30;
+            PARAMS.mathPerception = p.mathPerception != null ? p.mathPerception : 50;
+            PARAMS.mathBranchInterval = p.mathBranchInterval != null ? p.mathBranchInterval : 60;
+            PARAMS.mathBranchAngle = p.mathBranchAngle != null ? p.mathBranchAngle : 25;
+            PARAMS.mathGenerations = p.mathGenerations != null ? p.mathGenerations : 4;
+            updateMathFolderVisibility();
+            // Audio params
+            var wasAudioEnabled = PARAMS.audioEnabled;
+            PARAMS.audioEnabled = p.audioEnabled || false;
+            PARAMS.audioGain = p.audioGain != null ? p.audioGain : 100;
+            PARAMS.audioColorMap = p.audioColorMap || 'frequency';
+            PARAMS.audioSmoothing = p.audioSmoothing != null ? p.audioSmoothing : 70;
+            PARAMS.audioFftSize = p.audioFftSize || 2048;
+            PARAMS.audioRefreshRate = p.audioRefreshRate != null ? p.audioRefreshRate : 4;
+            PARAMS.audioLogScale = p.audioLogScale != null ? p.audioLogScale : true;
+            PARAMS.audioShowSpectrogram = p.audioShowSpectrogram || false;
+            PARAMS.audioSource = p.audioSource || 'mic';
+            // Toggle audio if state changed
+            if (wasAudioEnabled && !PARAMS.audioEnabled) stopAudio();
+            if (!wasAudioEnabled && PARAMS.audioEnabled) {
+                // Defer init until after start() creates chromata
+                setTimeout(function() { if (PARAMS.audioEnabled) initAudio(); }, 100);
+            }
+            // Clear auto-detected faces when loading a preset
+            detectedFaces = [];
+            FACE_MONITOR.detected = 'None';
+            drawFaceOverlay();
+            pane.refresh();
+            MONITOR.status = 'Preset: ' + name;
+        }
+
+        // ============ PRESETS: User saved ============
+        var STORAGE_KEY = 'chromata-presets-v2';
+
+        function getSavedPresets() {
+            var stored = localStorage.getItem(STORAGE_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        function savePreset() {
+            var name = presetNameObj.name.trim();
+            if (!name) { MONITOR.status = 'Enter preset name'; return; }
+            var saved = getSavedPresets();
+            var snapshot = Object.assign({}, PARAMS);
+            // Deep copy forceNodes array (Object.assign only copies reference)
+            snapshot.forceNodes = JSON.parse(JSON.stringify(PARAMS.forceNodes));
+            saved[name] = snapshot;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+            presetNameObj.name = '';
+            pane.refresh();
+            rebuildSavedPresets();
+            MONITOR.status = 'Saved: ' + name;
+        }
+
+        function loadSavedPreset(name) {
+            var saved = getSavedPresets();
+            if (!saved[name]) return;
+            var preset = saved[name];
+            Object.assign(PARAMS, preset);
+            PARAMS.forceNodes = preset.forceNodes ? JSON.parse(JSON.stringify(preset.forceNodes)) : [];
+            rebuildForceNodeUI();
+            drawFaceOverlay();
+            pane.refresh();
+            MONITOR.status = 'Loaded: ' + name;
+        }
+
+        function deleteSavedPreset(name) {
+            var saved = getSavedPresets();
+            delete saved[name];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+            rebuildSavedPresets();
+            MONITOR.status = 'Deleted: ' + name;
+        }
+
+        // ============ LIVE PARAMETER UPDATES ============
+        function getOptionsForLiveUpdate() {
+            return {
+                stepsPerFrame: PARAMS.stepsPerFrame,
+                speed: PARAMS.speed,
+                turningAngle: PARAMS.turningAngle * Math.PI,
+                sampleSize: PARAMS.sampleSize,
+                key: PARAMS.key,
+                lineWidth: PARAMS.lineWidth,
+                lineOpacity: PARAMS.lineOpacity / 100,
+                lineMode: PARAMS.lineMode,
+                colorMode: PARAMS.colorMode,
+                compositeOperation: PARAMS.compositeOperation,
+                jitter: PARAMS.jitter / 50,
+                alphaThreshold: PARAMS.alphaThreshold,
+                radialStrength: PARAMS.radialStrength / 100,
+                radialCenterX: chromata && chromata.dimensions ? Math.round(chromata.dimensions.width * PARAMS.radialCenterX / 100) : 0,
+                radialCenterY: chromata && chromata.dimensions ? Math.round(chromata.dimensions.height * PARAMS.radialCenterY / 100) : 0,
+                radialRadius: chromata && chromata.dimensions ? Math.round(Math.min(chromata.dimensions.width, chromata.dimensions.height) / 2 * PARAMS.radialRadius / 100) : 0,
+                mathStrength: PARAMS.mathStrength,
+                mathCenterXpx: chromata && chromata.dimensions ? Math.round(chromata.dimensions.width * PARAMS.mathCenterX / 100) : 0,
+                mathCenterYpx: chromata && chromata.dimensions ? Math.round(chromata.dimensions.height * PARAMS.mathCenterY / 100) : 0,
+                mathCurvatureRate: PARAMS.mathCurvatureRate,
+                mathCurvatureMax: PARAMS.mathCurvatureMax,
+                mathFreqX: PARAMS.mathFreqX,
+                mathFreqY: PARAMS.mathFreqY,
+                mathLissRate: PARAMS.mathLissRate,
+                mathLorenzChaos: PARAMS.mathLorenzChaos,
+                mathLorenzDt: PARAMS.mathLorenzDt,
+                mathFlowScale: PARAMS.mathFlowScale,
+                mathFlowEvolution: PARAMS.mathFlowEvolution,
+                mathFlowOctaves: PARAMS.mathFlowOctaves,
+                mathSeparation: PARAMS.mathSeparation,
+                mathAlignment: PARAMS.mathAlignment,
+                mathCohesion: PARAMS.mathCohesion,
+                mathPerception: PARAMS.mathPerception,
+                mathBranchInterval: PARAMS.mathBranchInterval,
+                mathBranchAngle: PARAMS.mathBranchAngle,
+                forceNodes: chromata && chromata.dimensions ? PARAMS.forceNodes.map(function(n) {
+                    var fnMinD = Math.min(chromata.dimensions.width, chromata.dimensions.height);
+                    var conv = {
+                        type: n.type,
+                        cx: chromata.dimensions.width * n.x / 100,
+                        cy: chromata.dimensions.height * n.y / 100,
+                        radiusPx: fnMinD / 2 * n.radius / 100,
+                        strength: n.strength / 100,
+                        ring: n.ring / 100,
+                        falloff: n.falloff / 100,
+                        direction: (n.direction || 0) * Math.PI / 180,
+                        orbitRadius: fnMinD / 2 * (n.orbit || 0) / 100,
+                        orbitSpeed: (n.orbitSpeed || 10) / 100,
+                        pulse: n.pulse || 0,
+                        brightnessMode: n.brightnessMode === 'bright' ? 1 : (n.brightnessMode === 'dark' ? 2 : 0)
+                    };
+                    conv._orbitCx = conv.cx;
+                    conv._orbitCy = conv.cy;
+                    conv._baseStrength = conv.strength;
+                    return conv;
+                }) : [],
+                ranges: (function() {
+                    var active = {};
+                    var anyActive = false;
+                    for (var p in RANGES) {
+                        if (RANGES[p].enabled) {
+                            active[p] = { min: RANGES[p].min, max: RANGES[p].max };
+                            anyActive = true;
+                        }
+                    }
+                    return anyActive ? active : null;
+                })(),
+                regionProfiles: regionProfilesEnabled ? (function() {
+                    var rp = {};
+                    for (var gi in regionProfiles) {
+                        var p = regionProfiles[gi];
+                        var overrides = {};
+                        var hasAny = false;
+                        if (p.speedOverride) { overrides.speed = p.speed; hasAny = true; }
+                        if (p.lineWidthOverride) { overrides.lineWidth = p.lineWidth; hasAny = true; }
+                        if (p.jitterOverride) { overrides.jitter = p.jitter / 50; hasAny = true; }
+                        if (p.turningAngleOverride) { overrides.turningAngle = p.turningAngle * Math.PI; hasAny = true; }
+                        if (p.opacityOverride) { overrides.lineOpacity = p.lineOpacity / 100; hasAny = true; }
+                        if (hasAny) rp[gi] = overrides;
+                    }
+                    return Object.keys(rp).length > 0 ? rp : null;
+                })() : null
+            };
+        }
+
+        pane.on('change', function() {
+            if (chromata && chromata.isRunning) {
+                chromata.updateOptions(getOptionsForLiveUpdate());
+                // Capture for recording
+                if (recording.active) {
+                    recording.changes.push({
+                        iteration: chromata.iterationCount - recording.startIteration,
+                        params: JSON.parse(JSON.stringify(PARAMS))
+                    });
+                }
+            }
+        });
+
+        // ============ MONITOR UPDATE ============
+        setInterval(function() {
+            if (chromata) {
+                var stats = chromata.getStats();
+                MONITOR.fps = stats.fps;
+                MONITOR.iterations = stats.iterations;
+                MONITOR.pathfinders = stats.pathfinders;
+                MONITOR.coverage = stats.coverage || 0;
+            }
+            tickPlayback();
+        }, 250);
+
+        // ============ INIT ============
+        rebuildSavedPresets();
+
+        // ============ FACE-API MODEL LOADER ============
+        (async function() {
+            // Wait for face-api.js to load (deferred script)
+            var attempts = 0;
+            while (typeof faceapi === 'undefined' && attempts < 50) {
+                await new Promise(function(r) { setTimeout(r, 200); });
+                attempts++;
+            }
+            if (typeof faceapi === 'undefined') {
+                console.warn('face-api.js failed to load');
+                return;
+            }
+            try {
+                var modelUri = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(modelUri),
+                    faceapi.nets.ssdMobilenetv1.loadFromUri(modelUri),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(modelUri)
+                ]);
+                faceApiReady = true;
+                console.log('Face detection models loaded (TinyFaceDetector + SSD Mobilenet)');
+                // Auto-detect if image already loaded
+                if (sourceImage.naturalWidth && !sourceImage.classList.contains('hidden')) {
+                    await detectFaces();
+                }
+            } catch (err) {
+                console.error('Face model load failed:', err);
+            }
+        })();
+    </script>
+</body>
+</html>

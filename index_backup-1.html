@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromata</title>
+    <script src="https://cdn.jsdelivr.net/npm/tweakpane@4/dist/tweakpane.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 10px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .layout {
+            display: flex;
+            gap: 10px;
+            height: 100%;
+        }
+        .controls {
+            width: 320px;
+            flex-shrink: 0;
+            overflow-y: auto;
+            height: calc(100vh - 20px);
+        }
+        .canvas-container {
+            flex: 1;
+            background: #000;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .canvas-container canvas, .canvas-container img {
+            max-width: 100%;
+            max-height: calc(100vh - 20px);
+            display: block;
+        }
+        .hidden { display: none !important; }
+        .drop-zone {
+            border: 2px dashed #555;
+            border-radius: 4px;
+            padding: 14px 8px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 11px;
+            margin-bottom: 6px;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #4a9eff;
+            background: rgba(74, 158, 255, 0.08);
+        }
+        .drop-zone p { margin: 0; color: #888; }
+        .tp-dfwv { width: 100% !important; }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <div class="controls" id="controlsPanel">
+            <div class="drop-zone" id="dropZone">
+                <p>Drop image or click to select</p>
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            </div>
+            <div id="tweakpane-container"></div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+            <img id="sourceImage" class="hidden" crossorigin="anonymous">
+        </div>
+    </div>
+
+    <script src="chromata-custom.js"></script>
+    <script>
+        // ============ STATE ============
+        let chromata = null;
+        let isRunning = false;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+
+        // ============ PARAMS (Tweakpane binds to this) ============
+        const PARAMS = {
+            colorMode: 'color',
+            compositeOperation: 'lighten',
+            key: 'low',
+            lineMode: 'smooth',
+            lineWidth: 2,
+            lineOpacity: 100,
+            outputSize: 'container',
+            pathFinderCount: 27,
+            speed: 8,
+            turningAngle: 1.0,
+            sampleSize: 16,
+            jitter: 0,
+            edgeDetect: 0,
+            alphaThreshold: 255,
+            iterationLimit: 0,
+            seed: '',
+            backgroundColor: '#000000',
+            backgroundAlpha: 0,
+            originBottom: true,
+            originTop: false,
+            originLeft: false,
+            originRight: false,
+            customOrigin: ''
+        };
+
+        const MONITOR = { fps: 0, iterations: 0, pathfinders: 0, status: 'Load an image' };
+
+        // ============ PRESETS ============
+        const presets = {
+            fractal: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'smooth', lineWidth: 2, pathFinderCount: 27,
+                speed: 8, turningAngle: 1, origin: ['bottom']
+            },
+            lines: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'square', lineWidth: 1, pathFinderCount: 50,
+                speed: 5, turningAngle: 0.5, origin: ['bottom', 'top']
+            },
+            impressionism: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'point', lineWidth: 4, pathFinderCount: 100,
+                speed: 3, turningAngle: 2, origin: ['bottom', 'top', 'left', 'right']
+            },
+            geometry: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'high',
+                lineMode: 'square', lineWidth: 2, pathFinderCount: 20,
+                speed: 10, turningAngle: 0.5, origin: ['bottom']
+            },
+            halftone: {
+                colorMode: 'greyscale', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'point', lineWidth: 3, pathFinderCount: 80,
+                speed: 4, turningAngle: 1.5, origin: ['left', 'right']
+            },
+            neon: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'smooth', lineWidth: 3, pathFinderCount: 40,
+                speed: 12, turningAngle: 0.8, origin: ['bottom']
+            },
+            pixel: {
+                colorMode: 'color', compositeOperation: 'lighten', key: 'low',
+                lineMode: 'square', lineWidth: 5, pathFinderCount: 60,
+                speed: 6, turningAngle: 0.3, origin: ['bottom', 'top']
+            },
+            sketch: {
+                colorMode: 'greyscale', compositeOperation: 'darken', key: 'high',
+                lineMode: 'smooth', lineWidth: 1, pathFinderCount: 150,
+                speed: 4, turningAngle: 1.2, origin: ['bottom', 'top', 'left', 'right']
+            }
+        };
+
+        // ============ DOM REFS ============
+        const dropZone = document.getElementById('dropZone');
+        const imageInput = document.getElementById('imageInput');
+        const sourceImage = document.getElementById('sourceImage');
+        const canvasContainer = document.getElementById('canvasContainer');
+
+        // ============ TWEAKPANE SETUP ============
+        const pane = new Tweakpane.Pane({
+            title: 'Chromata',
+            container: document.getElementById('tweakpane-container')
+        });
+
+        // -- Controls --
+        const ctrlFolder = pane.addFolder({ title: 'Controls', expanded: true });
+        ctrlFolder.addButton({ title: 'Start' }).on('click', start);
+        ctrlFolder.addButton({ title: 'Pause / Resume' }).on('click', toggle);
+        ctrlFolder.addButton({ title: 'Reset' }).on('click', reset);
+        ctrlFolder.addBinding(MONITOR, 'status', { readonly: true, label: 'Status', interval: 300 });
+
+        // -- Presets --
+        const presetsFolder = pane.addFolder({ title: 'Presets', expanded: false });
+        Object.keys(presets).forEach(function(name) {
+            presetsFolder.addButton({ title: name.charAt(0).toUpperCase() + name.slice(1) })
+                .on('click', function() { applyPreset(name); });
+        });
+        const myPresetsFolder = presetsFolder.addFolder({ title: 'My Presets', expanded: false });
+        const presetNameObj = { name: '' };
+        myPresetsFolder.addBinding(presetNameObj, 'name', { label: 'Name' });
+        myPresetsFolder.addButton({ title: 'Save Current' }).on('click', savePreset);
+        let savedPresetsFolder = null;
+
+        function rebuildSavedPresets() {
+            if (savedPresetsFolder) savedPresetsFolder.dispose();
+            savedPresetsFolder = null;
+            var saved = getSavedPresets();
+            var names = Object.keys(saved).sort();
+            if (names.length === 0) return;
+            savedPresetsFolder = myPresetsFolder.addFolder({ title: 'Saved', expanded: true });
+            names.forEach(function(n) {
+                var f = savedPresetsFolder.addFolder({ title: n, expanded: false });
+                f.addButton({ title: 'Load' }).on('click', function() { loadSavedPreset(n); });
+                f.addButton({ title: 'Delete' }).on('click', function() { deleteSavedPreset(n); });
+            });
+        }
+
+        // -- Display --
+        const displayFolder = pane.addFolder({ title: 'Display', expanded: false });
+        displayFolder.addBinding(PARAMS, 'colorMode', {
+            label: 'Color', options: { Color: 'color', Greyscale: 'greyscale' }
+        });
+        displayFolder.addBinding(PARAMS, 'key', {
+            options: { Low: 'low', High: 'high' }
+        });
+        displayFolder.addBinding(PARAMS, 'lineMode', {
+            label: 'Line', options: { Smooth: 'smooth', Square: 'square', Point: 'point' }
+        });
+        displayFolder.addBinding(PARAMS, 'compositeOperation', {
+            label: 'Blend', options: {
+                Lighten: 'lighten', 'Source Over': 'source-over',
+                Multiply: 'multiply', Screen: 'screen', Overlay: 'overlay',
+                Darken: 'darken', 'Color Dodge': 'color-dodge',
+                'Color Burn': 'color-burn', 'Hard Light': 'hard-light',
+                'Soft Light': 'soft-light', Difference: 'difference',
+                Exclusion: 'exclusion', Hue: 'hue',
+                Saturation: 'saturation', Color: 'color',
+                Luminosity: 'luminosity'
+            }
+        });
+        displayFolder.addBinding(PARAMS, 'outputSize', {
+            label: 'Size', options: { Container: 'container', Original: 'original' }
+        });
+        displayFolder.addBinding(PARAMS, 'backgroundColor', { label: 'BG Color' });
+        displayFolder.addBinding(PARAMS, 'backgroundAlpha', {
+            label: 'BG Alpha %', min: 0, max: 100, step: 1
+        });
+
+        // -- Path Finders --
+        const pfFolder = pane.addFolder({ title: 'Path Finders', expanded: true });
+        pfFolder.addBinding(PARAMS, 'pathFinderCount', { label: 'Count', min: 1, max: 1000, step: 1 });
+        pfFolder.addBinding(PARAMS, 'speed', { min: 1, max: 50, step: 1 });
+        pfFolder.addBinding(PARAMS, 'lineWidth', { label: 'Width', min: 1, max: 20, step: 1 });
+        pfFolder.addBinding(PARAMS, 'turningAngle', { label: 'Angle (xPi)', min: 0.1, max: 2, step: 0.1 });
+        pfFolder.addBinding(PARAMS, 'sampleSize', { label: 'Sample', min: 2, max: 32, step: 1 });
+        pfFolder.addBinding(PARAMS, 'lineOpacity', { label: 'Opacity %', min: 1, max: 100, step: 1 });
+        pfFolder.addBinding(PARAMS, 'jitter', { label: 'Jitter %', min: 0, max: 100, step: 1 });
+        pfFolder.addBinding(PARAMS, 'edgeDetect', { label: 'Edges %', min: 0, max: 100, step: 1 });
+        pfFolder.addBinding(PARAMS, 'alphaThreshold', { label: 'Alpha', min: 1, max: 255, step: 1 });
+        pfFolder.addBinding(PARAMS, 'iterationLimit', { label: 'Limit', min: 0, max: 10000, step: 100 });
+        pfFolder.addBinding(PARAMS, 'seed', { label: 'Seed' });
+
+        // -- Origins --
+        const originsFolder = pane.addFolder({ title: 'Origins', expanded: false });
+        originsFolder.addBinding(PARAMS, 'originBottom', { label: 'Bottom' });
+        originsFolder.addBinding(PARAMS, 'originTop', { label: 'Top' });
+        originsFolder.addBinding(PARAMS, 'originLeft', { label: 'Left' });
+        originsFolder.addBinding(PARAMS, 'originRight', { label: 'Right' });
+        originsFolder.addBinding(PARAMS, 'customOrigin', { label: 'Custom' });
+
+        // -- Export --
+        const exportFolder = pane.addFolder({ title: 'Export', expanded: false });
+        exportFolder.addButton({ title: 'Save PNG' }).on('click', savePNG);
+        exportFolder.addButton({ title: 'Record WebM' }).on('click', toggleRecording);
+        exportFolder.addButton({ title: 'Export SVG' }).on('click', exportSVG);
+
+        // -- Monitor --
+        const monitorFolder = pane.addFolder({ title: 'Monitor', expanded: true });
+        monitorFolder.addBinding(MONITOR, 'fps', { readonly: true, interval: 300 });
+        monitorFolder.addBinding(MONITOR, 'iterations', { readonly: true, interval: 300 });
+        monitorFolder.addBinding(MONITOR, 'pathfinders', { readonly: true, interval: 500 });
+
+        // ============ OPTIONS BUILDER ============
+        function hexToRgba(hex, alpha) {
+            var r = parseInt(hex.slice(1, 3), 16);
+            var g = parseInt(hex.slice(3, 5), 16);
+            var b = parseInt(hex.slice(5, 7), 16);
+            return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+        }
+
+        function getOptions() {
+            var origins = [];
+            if (PARAMS.originBottom) origins.push('bottom');
+            if (PARAMS.originTop) origins.push('top');
+            if (PARAMS.originLeft) origins.push('left');
+            if (PARAMS.originRight) origins.push('right');
+            var custom = PARAMS.customOrigin.trim();
+            if (custom) {
+                origins = origins.concat(custom.split(',').map(function(s) { return s.trim(); }).filter(Boolean));
+            }
+            if (origins.length === 0) origins = ['bottom'];
+
+            return {
+                colorMode: PARAMS.colorMode,
+                compositeOperation: PARAMS.compositeOperation,
+                key: PARAMS.key,
+                lineMode: PARAMS.lineMode,
+                lineWidth: PARAMS.lineWidth,
+                lineOpacity: PARAMS.lineOpacity / 100,
+                outputSize: PARAMS.outputSize,
+                pathFinderCount: PARAMS.pathFinderCount,
+                speed: PARAMS.speed,
+                turningAngle: PARAMS.turningAngle * Math.PI,
+                sampleSize: PARAMS.sampleSize,
+                jitter: PARAMS.jitter / 50,
+                edgeDetect: PARAMS.edgeDetect / 100,
+                alphaThreshold: PARAMS.alphaThreshold,
+                iterationLimit: PARAMS.iterationLimit,
+                seed: PARAMS.seed.trim() ? parseInt(PARAMS.seed) : null,
+                origin: origins,
+                backgroundColor: hexToRgba(PARAMS.backgroundColor, PARAMS.backgroundAlpha / 100)
+            };
+        }
+
+        // ============ IMAGE LOADING ============
+        function loadImage(file) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                sourceImage.src = e.target.result;
+                sourceImage.onload = function() {
+                    sourceImage.classList.remove('hidden');
+                    MONITOR.status = 'Image loaded';
+                    if (chromata) { chromata.reset(); chromata = null; }
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        dropZone.addEventListener('click', function() { imageInput.click(); });
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            var file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) loadImage(file);
+        });
+        imageInput.addEventListener('change', function(e) {
+            if (e.target.files[0]) loadImage(e.target.files[0]);
+        });
+
+        // ============ ACTIONS ============
+        function start() {
+            if (!sourceImage.src) { MONITOR.status = 'Load an image first'; return; }
+            if (chromata) chromata.reset();
+            chromata = new Chromata(sourceImage, getOptions());
+            chromata.start();
+            isRunning = true;
+            MONITOR.status = 'Running';
+        }
+
+        function toggle() {
+            if (!chromata) return;
+            chromata.toggle();
+            isRunning = !isRunning;
+            MONITOR.status = isRunning ? 'Running' : 'Paused';
+        }
+
+        function reset() {
+            if (chromata) { chromata.reset(); chromata = null; }
+            isRunning = false;
+            MONITOR.status = 'Reset';
+            MONITOR.fps = 0;
+            MONITOR.iterations = 0;
+            MONITOR.pathfinders = 0;
+            sourceImage.classList.remove('hidden');
+        }
+
+        // ============ EXPORT: PNG ============
+        function savePNG() {
+            var canvas = canvasContainer.querySelector('canvas');
+            if (!canvas) { MONITOR.status = 'No canvas to save'; return; }
+            var link = document.createElement('a');
+            link.download = 'chromata-' + Date.now() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            MONITOR.status = 'PNG saved';
+        }
+
+        // ============ EXPORT: VIDEO ============
+        function toggleRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                MONITOR.status = 'Encoding video...';
+                return;
+            }
+            var canvas = canvasContainer.querySelector('canvas');
+            if (!canvas) { MONITOR.status = 'Start animation first'; return; }
+
+            recordedChunks = [];
+            var stream = canvas.captureStream(30);
+            mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'video/webm;codecs=vp9',
+                videoBitsPerSecond: 8000000
+            });
+            mediaRecorder.ondataavailable = function(e) {
+                if (e.data.size > 0) recordedChunks.push(e.data);
+            };
+            mediaRecorder.onstop = function() {
+                var blob = new Blob(recordedChunks, { type: 'video/webm' });
+                var url = URL.createObjectURL(blob);
+                var link = document.createElement('a');
+                link.download = 'chromata-' + Date.now() + '.webm';
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+                MONITOR.status = 'Video saved';
+            };
+            mediaRecorder.start(100);
+            MONITOR.status = 'Recording...';
+        }
+
+        // ============ EXPORT: SVG ============
+        function exportSVG() {
+            if (!chromata) { MONITOR.status = 'Run animation first'; return; }
+            var svgString = chromata.exportSVG();
+            if (!svgString) { MONITOR.status = 'No paths recorded'; return; }
+            var blob = new Blob([svgString], { type: 'image/svg+xml' });
+            var url = URL.createObjectURL(blob);
+            var link = document.createElement('a');
+            link.download = 'chromata-' + Date.now() + '.svg';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            MONITOR.status = 'SVG exported';
+        }
+
+        // ============ PRESETS: Built-in ============
+        function applyPreset(name) {
+            var p = presets[name];
+            if (!p) return;
+            PARAMS.colorMode = p.colorMode || 'color';
+            PARAMS.compositeOperation = p.compositeOperation || 'lighten';
+            PARAMS.key = p.key || 'low';
+            PARAMS.lineMode = p.lineMode || 'smooth';
+            PARAMS.lineWidth = p.lineWidth || 2;
+            PARAMS.pathFinderCount = p.pathFinderCount || 27;
+            PARAMS.speed = p.speed || 8;
+            PARAMS.turningAngle = p.turningAngle || 1;
+            var origins = p.origin || ['bottom'];
+            PARAMS.originBottom = origins.includes('bottom');
+            PARAMS.originTop = origins.includes('top');
+            PARAMS.originLeft = origins.includes('left');
+            PARAMS.originRight = origins.includes('right');
+            pane.refresh();
+            MONITOR.status = 'Preset: ' + name;
+        }
+
+        // ============ PRESETS: User saved ============
+        var STORAGE_KEY = 'chromata-presets-v2';
+
+        function getSavedPresets() {
+            var stored = localStorage.getItem(STORAGE_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        function savePreset() {
+            var name = presetNameObj.name.trim();
+            if (!name) { MONITOR.status = 'Enter preset name'; return; }
+            var saved = getSavedPresets();
+            saved[name] = Object.assign({}, PARAMS);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+            presetNameObj.name = '';
+            pane.refresh();
+            rebuildSavedPresets();
+            MONITOR.status = 'Saved: ' + name;
+        }
+
+        function loadSavedPreset(name) {
+            var saved = getSavedPresets();
+            if (!saved[name]) return;
+            Object.assign(PARAMS, saved[name]);
+            pane.refresh();
+            MONITOR.status = 'Loaded: ' + name;
+        }
+
+        function deleteSavedPreset(name) {
+            var saved = getSavedPresets();
+            delete saved[name];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+            rebuildSavedPresets();
+            MONITOR.status = 'Deleted: ' + name;
+        }
+
+        // ============ MONITOR UPDATE ============
+        setInterval(function() {
+            if (chromata) {
+                var stats = chromata.getStats();
+                MONITOR.fps = stats.fps;
+                MONITOR.iterations = stats.iterations;
+                MONITOR.pathfinders = stats.pathfinders;
+            }
+        }, 250);
+
+        // ============ INIT ============
+        rebuildSavedPresets();
+    </script>
+</body>
+</html>
