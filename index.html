@@ -1395,7 +1395,7 @@
 
         // -- Click-to-Place System --
         var placeTypeObj = { type: 'gravity' };
-        forceNodesFolder.addSeparator();
+        forceNodesFolder.addBlade({ view: 'separator' });
         forceNodesFolder.addBinding(placeTypeObj, 'type', {
             label: 'Place Type', options: { Gravity: 'gravity', Repulsion: 'repulsion', Vortex: 'vortex', Directional: 'directional' }
         });
@@ -1518,7 +1518,7 @@
         };
 
         // -- Auto-Arrange --
-        forceNodesFolder.addSeparator();
+        forceNodesFolder.addBlade({ view: 'separator' });
         var arrangeFolder = forceNodesFolder.addFolder({ title: 'Auto-Arrange', expanded: false });
         arrangeFolder.addBinding(PARAMS, 'arrangeCount', { label: 'Count', min: 2, max: 20, step: 1 });
         arrangeFolder.addBinding(PARAMS, 'arrangePattern', {
