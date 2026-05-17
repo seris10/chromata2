@@ -222,6 +222,3 @@ Edge Detect: 0.5-0.7
 Edge Strength: 1.0
 ```
 
----
-
-*Reference: chromata-reference.json | kjr 2026-02-11*

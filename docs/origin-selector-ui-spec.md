@@ -1,8 +1,6 @@
-# Chromata Origin Selector UI Spec
+# Origin Selector UI Spec
 
-## Overview
-
-Design and implement a new Origin Selector UI component for the Chromata editor. The current dropdown selector needs to be replaced with an interactive percentage-based allocation system.
+A spec for the percentage-based origin allocator that replaced the dropdown selector in the Chromata editor.
 
 ---
 
