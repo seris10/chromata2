@@ -1297,7 +1297,7 @@
                 pathFinderCount: 30,
                 speed: 7,
                 turningAngle: Math.PI,
-                sampleSize: 16,
+                sampleSize: 4,
                 pathMemory: 10,
                 jitter: 0,
                 edgeDetect: 0,

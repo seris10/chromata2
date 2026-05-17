@@ -1,3 +1,9 @@
 node_modules/
 .DS_Store
 .wrangler/
+experiments/
+original/
+src/
+*.md
+*_backup-*
+*backup-*

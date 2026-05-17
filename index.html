@@ -68,6 +68,299 @@
         }
         .drop-zone p { margin: 0; color: #888; }
         .tp-dfwv { width: 100% !important; }
+        
+        /* Origin Selector UI */
+        .origin-selector {
+            margin-top: 12px;
+            padding: 12px;
+            background: #222;
+            border-radius: 6px;
+        }
+        
+        .budget-bar-container {
+            margin-bottom: 16px;
+        }
+        
+        .budget-bar {
+            height: 24px;
+            background: #333;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 6px;
+            border: 1px solid #444;
+        }
+        
+        .budget-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a90d9, #67b26f);
+            transition: width 0.2s ease;
+            width: 0%;
+        }
+        
+        .budget-bar-fill.warning {
+            background: linear-gradient(90deg, #d9a04a, #d94a4a);
+        }
+        
+        .budget-label {
+            font-size: 12px;
+            color: #aaa;
+            display: block;
+            text-align: right;
+        }
+        
+        .origin-section {
+            margin-bottom: 16px;
+        }
+        
+        .origin-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .origin-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        
+        @media (max-width: 400px) {
+            .origin-cards-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .origin-card {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 10px 8px;
+            text-align: center;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        
+        .origin-card.active {
+            border-color: #5b9dd9;
+            background: #2a3a4a;
+        }
+        
+        .origin-card.custom {
+            position: relative;
+            padding-right: 22px;
+        }
+        
+        .origin-card-label {
+            font-size: 11px;
+            color: #bbb;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .origin-card-input-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        
+        .origin-card input {
+            width: 44px;
+            background: #1a1a1a;
+            border: 1px solid #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 4px 2px;
+            font-size: 13px;
+        }
+        
+        .origin-card input:focus {
+            outline: none;
+            border-color: #5b9dd9;
+        }
+        
+        .origin-card input:disabled {
+            opacity: 0.5;
+        }
+        
+        .origin-card-suffix {
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .origin-card-remove {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 16px;
+            height: 16px;
+            background: #444;
+            border: none;
+            border-radius: 50%;
+            color: #aaa;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+        }
+        
+        .origin-card-remove:hover {
+            background: #d94a4a;
+            color: #fff;
+        }
+        
+        .origin-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .origin-btn {
+            background: #3a3a3a;
+            border: 1px solid #555;
+            color: #ddd;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        
+        .origin-btn:hover {
+            background: #4a4a4a;
+            border-color: #666;
+        }
+        
+        .origin-btn.primary {
+            background: #4a90d9;
+            border-color: #5b9dd9;
+            color: #fff;
+        }
+        
+        .origin-btn.primary:hover {
+            background: #5b9dd9;
+        }
+        
+        .origin-btn.active-mode {
+            background: #d9a04a;
+            border-color: #e9b05a;
+            color: #fff;
+        }
+        
+        .origin-presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #444;
+        }
+        
+        .origin-preset-btn {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #bbb;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            flex: 1;
+            min-width: 70px;
+        }
+        
+        .origin-preset-btn:hover {
+            background: #3a3a3a;
+            border-color: #5b9dd9;
+            color: #fff;
+        }
+        
+        .custom-points-section {
+            margin-top: 12px;
+        }
+        
+        .custom-points-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        @media (max-width: 400px) {
+            .custom-points-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .crosshair-mode .canvas-container {
+            cursor: crosshair !important;
+        }
+
+        /* Mode toggle */
+        .mode-toggle {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            display: flex;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            overflow: hidden;
+            font-size: 12px;
+        }
+        .mode-toggle button {
+            background: none;
+            border: none;
+            color: #888;
+            padding: 6px 14px;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .mode-toggle button.active {
+            background: #4a90d9;
+            color: #fff;
+        }
+        .mode-toggle button:hover:not(.active) {
+            background: #333;
+            color: #ccc;
+        }
+
+        /* Simple mode */
+        body.simple-mode .controls { display: none; }
+        body.simple-mode .canvas-container { cursor: pointer; }
+        body.simple-mode .simple-drop-hint {
+            display: flex;
+        }
+        .simple-drop-hint {
+            display: none;
+            position: absolute;
+            inset: 0;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 14px;
+            pointer-events: none;
+        }
+        
+        .origin-status {
+            font-size: 11px;
+            color: #888;
+            margin-top: 8px;
+            font-style: italic;
+        }
+        
+        .origin-status.error {
+            color: #d94a4a;
+        }
         /* Tooltips */
         .tooltips-on [data-tip] {
             position: relative;
@@ -91,6 +384,10 @@
     </style>
 </head>
 <body>
+    <div class="mode-toggle" id="modeToggle">
+        <button data-mode="simple">Simple</button>
+        <button data-mode="advanced" class="active">Advanced</button>
+    </div>
     <div class="layout">
         <div class="controls" id="controlsPanel">
             <div class="drop-zone" id="dropZone">
@@ -98,9 +395,127 @@
                 <input type="file" id="imageInput" accept="image/*" style="display: none;">
             </div>
             <div id="tweakpane-container"></div>
+            
+            <!-- Origin Selector UI -->
+            <div class="origin-selector" id="originSelector">
+                <div class="budget-bar-container">
+                    <div class="budget-bar">
+                        <div class="budget-bar-fill" id="budgetBarFill"></div>
+                    </div>
+                    <span class="budget-label" id="budgetLabel">0% allocated</span>
+                </div>
+                
+                <div class="origin-sections" id="originSections">
+                    <!-- Edges -->
+                    <div class="origin-section">
+                        <div class="origin-section-title">Edges</div>
+                        <div class="origin-cards-grid">
+                            <div class="origin-card" data-origin="top">
+                                <div class="origin-card-label">Top</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="top">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                            <div class="origin-card" data-origin="bottom">
+                                <div class="origin-card-label">Bottom</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="bottom">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                            <div class="origin-card" data-origin="left">
+                                <div class="origin-card-label">Left</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="left">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                            <div class="origin-card" data-origin="right">
+                                <div class="origin-card-label">Right</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="right">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Corners -->
+                    <div class="origin-section">
+                        <div class="origin-section-title">Corners</div>
+                        <div class="origin-cards-grid">
+                            <div class="origin-card" data-origin="top-left">
+                                <div class="origin-card-label">Top-Left</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="top-left">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                            <div class="origin-card" data-origin="top-right">
+                                <div class="origin-card-label">Top-Right</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="top-right">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                            <div class="origin-card" data-origin="bottom-left">
+                                <div class="origin-card-label">Bottom-Left</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="bottom-left">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                            <div class="origin-card" data-origin="bottom-right">
+                                <div class="origin-card-label">Bottom-Right</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="bottom-right">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Center -->
+                    <div class="origin-section">
+                        <div class="origin-section-title">Center</div>
+                        <div class="origin-cards-grid" style="grid-template-columns: repeat(4, 1fr);">
+                            <div class="origin-card" data-origin="center">
+                                <div class="origin-card-label">Center</div>
+                                <div class="origin-card-input-wrapper">
+                                    <input type="number" min="0" max="100" value="0" data-origin="center">
+                                    <span class="origin-card-suffix">%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Custom Points -->
+                    <div class="origin-section custom-points-section" id="customPointsSection" style="display: none;">
+                        <div class="origin-section-title">Custom Points</div>
+                        <div class="custom-points-grid" id="customPointsGrid">
+                            <!-- Custom points added dynamically -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="origin-actions">
+                    <button class="origin-btn primary" id="addCustomPointBtn">+ Add Custom Point</button>
+                    <button class="origin-btn" id="autoDistributeBtn">Auto-Distribute Remaining</button>
+                </div>
+                
+                <div class="origin-presets">
+                    <button class="origin-preset-btn" data-preset="all-edges">All Edges</button>
+                    <button class="origin-preset-btn" data-preset="all-corners">All Corners</button>
+                    <button class="origin-preset-btn" data-preset="radial-burst">Radial Burst</button>
+                </div>
+                
+                <div class="origin-status" id="originStatus"></div>
+            </div>
         </div>
 
         <div class="canvas-container" id="canvasContainer">
+            <div class="simple-drop-hint" id="simpleDropHint">Drop an image or click to load</div>
             <div class="img-wrapper" id="imgWrapper">
                 <img id="sourceImage" class="hidden" crossorigin="anonymous">
                 <canvas id="faceOverlayCanvas" class="hidden"></canvas>
@@ -137,7 +552,7 @@
             pathFinderCount: 27,
             speed: 8,
             turningAngle: 1.0,
-            sampleSize: 16,
+            sampleSize: 4,
             jitter: 0,
             edgeDetect: 0,
             alphaThreshold: 255,
@@ -208,6 +623,395 @@
             audioLogScale: true,
             audioShowSpectrogram: false,
             audioSource: 'mic'
+        };
+
+        // ============ ORIGIN SELECTOR UI ============
+        const OriginSelector = {
+            weights: {},
+            customPoints: [],
+            nextCustomId: 1,
+            settingCustomPoint: false,
+            
+            init() {
+                this.attachEventListeners();
+                // Set default: bottom 100%
+                this.weights = { 'bottom': 100 };
+                this.updateUI();
+            },
+            
+            attachEventListeners() {
+                const self = this;
+                
+                // Origin card inputs
+                document.querySelectorAll('.origin-card input').forEach(input => {
+                    input.addEventListener('change', function(e) {
+                        const origin = e.target.dataset.origin;
+                        let value = parseInt(e.target.value) || 0;
+                        value = Math.max(0, Math.min(100, value));
+                        
+                        const currentTotal = self.getTotalAllocated();
+                        const otherTotal = currentTotal - (self.weights[origin] || 0);
+                        
+                        // Prevent exceeding 100%
+                        if (otherTotal + value > 100) {
+                            value = 100 - otherTotal;
+                            e.target.value = value;
+                            self.showStatus('Cannot exceed 100% total allocation', true);
+                        }
+                        
+                        self.weights[origin] = value;
+                        self.updateUI();
+                        self.applyToChromata();
+                    });
+                    
+                    // Validate on input to prevent exceeding 100
+                    input.addEventListener('input', function(e) {
+                        const origin = e.target.dataset.origin;
+                        let value = parseInt(e.target.value) || 0;
+                        
+                        const currentTotal = self.getTotalAllocated();
+                        const otherTotal = currentTotal - (self.weights[origin] || 0);
+                        
+                        if (otherTotal + value > 100) {
+                            e.target.style.borderColor = '#d94a4a';
+                        } else {
+                            e.target.style.borderColor = '';
+                        }
+                    });
+                });
+                
+                // Add custom point button
+                document.getElementById('addCustomPointBtn').addEventListener('click', () => {
+                    this.startCustomPointMode();
+                });
+                
+                // Auto-distribute button
+                document.getElementById('autoDistributeBtn').addEventListener('click', () => {
+                    this.autoDistribute();
+                });
+                
+                // Preset buttons
+                document.querySelectorAll('.origin-preset-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        this.applyPreset(e.target.dataset.preset);
+                    });
+                });
+                
+                // Canvas click for custom point
+                const canvasContainer = document.getElementById('canvasContainer');
+                canvasContainer.addEventListener('click', (e) => {
+                    if (this.settingCustomPoint) {
+                        this.handleCanvasClick(e);
+                    }
+                });
+                
+                // Escape to cancel custom point mode
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && this.settingCustomPoint) {
+                        this.cancelCustomPointMode();
+                    }
+                });
+            },
+            
+            getTotalAllocated() {
+                let total = 0;
+                for (let key in this.weights) {
+                    total += this.weights[key] || 0;
+                }
+                return total;
+            },
+            
+            updateUI() {
+                const total = this.getTotalAllocated();
+                const remaining = 100 - total;
+                
+                // Update budget bar
+                const barFill = document.getElementById('budgetBarFill');
+                const label = document.getElementById('budgetLabel');
+                
+                barFill.style.width = total + '%';
+                
+                if (total > 100) {
+                    barFill.classList.add('warning');
+                    label.textContent = total + '% allocated (exceeds 100%)';
+                } else if (total === 100) {
+                    barFill.classList.remove('warning');
+                    label.textContent = '100% allocated';
+                } else {
+                    barFill.classList.remove('warning');
+                    label.textContent = total + '% allocated (' + remaining + '% remaining)';
+                }
+                
+                // Update card active states
+                document.querySelectorAll('.origin-card').forEach(card => {
+                    const origin = card.dataset.origin;
+                    const value = this.weights[origin] || 0;
+                    const input = card.querySelector('input');
+                    
+                    if (input && input.value !== String(value)) {
+                        input.value = value;
+                    }
+                    
+                    if (value > 0) {
+                        card.classList.add('active');
+                    } else {
+                        card.classList.remove('active');
+                    }
+                });
+                
+                // Clear any error styling on inputs
+                document.querySelectorAll('.origin-card input').forEach(input => {
+                    input.style.borderColor = '';
+                });
+            },
+            
+            startCustomPointMode() {
+                this.settingCustomPoint = true;
+                const btn = document.getElementById('addCustomPointBtn');
+                btn.textContent = 'Click canvas to set point... (ESC to cancel)';
+                btn.classList.add('active-mode');
+                document.body.classList.add('crosshair-mode');
+                this.showStatus('Click anywhere on the canvas to place a custom origin point');
+            },
+            
+            cancelCustomPointMode() {
+                this.settingCustomPoint = false;
+                const btn = document.getElementById('addCustomPointBtn');
+                btn.textContent = '+ Add Custom Point';
+                btn.classList.remove('active-mode');
+                document.body.classList.remove('crosshair-mode');
+                this.showStatus('');
+            },
+            
+            handleCanvasClick(e) {
+                const container = document.getElementById('canvasContainer');
+                const rect = container.getBoundingClientRect();
+                const imgWrapper = document.getElementById('imgWrapper');
+                const imgRect = imgWrapper.getBoundingClientRect();
+                
+                // Calculate click position relative to the displayed image
+                let xPct = Math.round(((e.clientX - imgRect.left) / imgRect.width) * 100);
+                let yPct = Math.round(((e.clientY - imgRect.top) / imgRect.height) * 100);
+                
+                // Clamp to 0-100
+                xPct = Math.max(0, Math.min(100, xPct));
+                yPct = Math.max(0, Math.min(100, yPct));
+                
+                this.addCustomPoint(xPct, yPct);
+                this.cancelCustomPointMode();
+            },
+            
+            addCustomPoint(xPct, yPct) {
+                const id = this.nextCustomId++;
+                const coordKey = xPct + '% ' + yPct + '%';
+                
+                this.customPoints.push({
+                    id: id,
+                    x: xPct,
+                    y: yPct,
+                    key: coordKey
+                });
+                
+                // Show custom points section
+                document.getElementById('customPointsSection').style.display = '';
+                
+                // Create custom point card
+                const grid = document.getElementById('customPointsGrid');
+                const card = document.createElement('div');
+                card.className = 'origin-card custom';
+                card.dataset.origin = coordKey;
+                card.dataset.customId = id;
+                card.innerHTML = `
+                    <button class="origin-card-remove" data-custom-id="${id}">×</button>
+                    <div class="origin-card-label">${coordKey}</div>
+                    <div class="origin-card-input-wrapper">
+                        <input type="number" min="0" max="100" value="0" data-origin="${coordKey}">
+                        <span class="origin-card-suffix">%</span>
+                    </div>
+                `;
+                
+                // Add event listeners to new input
+                const input = card.querySelector('input');
+                input.addEventListener('change', (e) => {
+                    let value = parseInt(e.target.value) || 0;
+                    value = Math.max(0, Math.min(100, value));
+                    
+                    const currentTotal = this.getTotalAllocated();
+                    const otherTotal = currentTotal - (this.weights[coordKey] || 0);
+                    
+                    if (otherTotal + value > 100) {
+                        value = 100 - otherTotal;
+                        e.target.value = value;
+                        this.showStatus('Cannot exceed 100% total allocation', true);
+                    }
+                    
+                    this.weights[coordKey] = value;
+                    this.updateUI();
+                    this.applyToChromata();
+                });
+                
+                input.addEventListener('input', (e) => {
+                    let value = parseInt(e.target.value) || 0;
+                    const currentTotal = this.getTotalAllocated();
+                    const otherTotal = currentTotal - (this.weights[coordKey] || 0);
+                    
+                    if (otherTotal + value > 100) {
+                        e.target.style.borderColor = '#d94a4a';
+                    } else {
+                        e.target.style.borderColor = '';
+                    }
+                });
+                
+                // Remove button
+                const removeBtn = card.querySelector('.origin-card-remove');
+                removeBtn.addEventListener('click', () => {
+                    this.removeCustomPoint(id);
+                });
+                
+                grid.appendChild(card);
+                this.showStatus('Custom point added at ' + coordKey);
+            },
+            
+            removeCustomPoint(id) {
+                const point = this.customPoints.find(p => p.id === id);
+                if (!point) return;
+                
+                // Remove from weights
+                delete this.weights[point.key];
+                
+                // Remove from array
+                this.customPoints = this.customPoints.filter(p => p.id !== id);
+                
+                // Remove card from DOM
+                const card = document.querySelector('.origin-card[data-custom-id="' + id + '"]');
+                if (card) {
+                    card.remove();
+                }
+                
+                // Hide section if no custom points
+                if (this.customPoints.length === 0) {
+                    document.getElementById('customPointsSection').style.display = 'none';
+                }
+                
+                this.updateUI();
+                this.applyToChromata();
+            },
+            
+            autoDistribute() {
+                const total = this.getTotalAllocated();
+                const remaining = 100 - total;
+                
+                if (remaining <= 0) {
+                    this.showStatus('No remaining budget to distribute', true);
+                    return;
+                }
+                
+                // Find active origins (those with > 0 weight)
+                const activeOrigins = [];
+                for (let key in this.weights) {
+                    if (this.weights[key] > 0) {
+                        activeOrigins.push(key);
+                    }
+                }
+                
+                if (activeOrigins.length === 0) {
+                    this.showStatus('No active origins to distribute to', true);
+                    return;
+                }
+                
+                // Divide remaining equally
+                const perOrigin = Math.floor(remaining / activeOrigins.length);
+                let remainder = remaining - (perOrigin * activeOrigins.length);
+                
+                activeOrigins.forEach(origin => {
+                    this.weights[origin] = (this.weights[origin] || 0) + perOrigin;
+                    if (remainder > 0) {
+                        this.weights[origin]++;
+                        remainder--;
+                    }
+                });
+                
+                this.updateUI();
+                this.applyToChromata();
+                this.showStatus('Distributed ' + remaining + '% across ' + activeOrigins.length + ' origins');
+            },
+            
+            applyPreset(name) {
+                // Clear all weights first
+                this.weights = {};
+                
+                switch (name) {
+                    case 'all-edges':
+                        this.weights['top'] = 25;
+                        this.weights['bottom'] = 25;
+                        this.weights['left'] = 25;
+                        this.weights['right'] = 25;
+                        break;
+                    case 'all-corners':
+                        this.weights['top-left'] = 25;
+                        this.weights['top-right'] = 25;
+                        this.weights['bottom-left'] = 25;
+                        this.weights['bottom-right'] = 25;
+                        break;
+                    case 'radial-burst':
+                        this.weights['center'] = 100;
+                        break;
+                }
+                
+                this.updateUI();
+                this.applyToChromata();
+                this.showStatus('Applied preset: ' + name.replace('-', ' '));
+            },
+            
+            getOriginWeights() {
+                const result = {};
+                for (let key in this.weights) {
+                    if (this.weights[key] > 0) {
+                        result[key] = this.weights[key];
+                    }
+                }
+                return result;
+            },
+            
+            applyToChromata() {
+                if (chromata && chromata.isRunning) {
+                    // Need to reset and restart for origin changes
+                    chromata.reset();
+                    chromata = new Chromata(sourceImage, getOptions());
+                    chromata.start();
+                }
+            },
+            
+            showStatus(message, isError = false) {
+                const status = document.getElementById('originStatus');
+                status.textContent = message;
+                status.className = 'origin-status' + (isError ? ' error' : '');
+                
+                if (message && !isError) {
+                    setTimeout(() => {
+                        if (status.textContent === message) {
+                            status.textContent = '';
+                        }
+                    }, 3000);
+                }
+            },
+            
+            reset() {
+                this.weights = {};
+                this.customPoints = [];
+                this.nextCustomId = 1;
+                
+                // Clear custom points from DOM
+                document.getElementById('customPointsGrid').innerHTML = '';
+                document.getElementById('customPointsSection').style.display = 'none';
+                
+                // Reset all inputs
+                document.querySelectorAll('.origin-card input').forEach(input => {
+                    input.value = '0';
+                });
+                
+                this.updateUI();
+            }
         };
 
         const MONITOR = { fps: 0, iterations: 0, pathfinders: 0, coverage: 0, status: 'Load an image' };
@@ -634,6 +1438,13 @@
                 lineMode: 'smooth', lineWidth: 1, pathFinderCount: 150,
                 speed: 4, turningAngle: 1.2, origin: ['bottom', 'top', 'left', 'right']
             },
+            photoreal: {
+                colorMode: 'color', compositeOperation: 'source-over', key: 'low',
+                lineMode: 'smooth', lineWidth: 1, pathFinderCount: 500,
+                speed: 3, turningAngle: 0.3, sampleSize: 12, pixelSize: 1,
+                lineOpacity: 100, jitter: 0, stepsPerFrame: 15,
+                origin: ['bottom', 'top', 'left', 'right']
+            },
             'fibonacci-sunflower': {
                 mathMode: 'fibonacci', mathStrength: 70, pathFinderCount: 200,
                 speed: 6, turningAngle: 0.8, origin: ['center'], lineWidth: 1.5,
@@ -994,13 +1805,8 @@
         pfFolder.addBinding(PARAMS, 'stepsPerFrame', { label: 'Steps/Frame', min: 1, max: 20, step: 1 });
         pfFolder.addBinding(PARAMS, 'seed', { label: 'Seed' });
 
-        // -- Origins --
-        const originsFolder = pane.addFolder({ title: 'Origins', expanded: false });
-        originsFolder.addBinding(PARAMS, 'originBottom', { label: 'Bottom' });
-        originsFolder.addBinding(PARAMS, 'originTop', { label: 'Top' });
-        originsFolder.addBinding(PARAMS, 'originLeft', { label: 'Left' });
-        originsFolder.addBinding(PARAMS, 'originRight', { label: 'Right' });
-        originsFolder.addBinding(PARAMS, 'customOrigin', { label: 'Custom' });
+        // -- Origins (handled by OriginSelector UI) --
+        // Origins Tweakpane folder removed - use Origin Selector UI below
 
         // -- Radial --
         const radialFolder = pane.addFolder({ title: 'Radial', expanded: false });
@@ -1960,16 +2766,13 @@
         }
 
         function getOptions() {
-            var origins = [];
-            if (PARAMS.originBottom) origins.push('bottom');
-            if (PARAMS.originTop) origins.push('top');
-            if (PARAMS.originLeft) origins.push('left');
-            if (PARAMS.originRight) origins.push('right');
-            var custom = PARAMS.customOrigin.trim();
-            if (custom) {
-                origins = origins.concat(custom.split(',').map(function(s) { return s.trim(); }).filter(Boolean));
+            // Get origin weights from OriginSelector
+            var originWeights = OriginSelector.getOriginWeights();
+            
+            // If no origins set, default to bottom 100%
+            if (Object.keys(originWeights).length === 0) {
+                originWeights = { 'bottom': 100 };
             }
-            if (origins.length === 0) origins = ['bottom'];
 
             return {
                 colorMode: PARAMS.colorMode,
@@ -1990,7 +2793,7 @@
                 iterationLimit: PARAMS.iterationLimit,
                 stepsPerFrame: PARAMS.stepsPerFrame,
                 seed: PARAMS.seed.trim() ? parseInt(PARAMS.seed) : null,
-                origin: origins,
+                originWeights: originWeights,
                 backgroundColor: hexToRgba(PARAMS.backgroundColor, PARAMS.backgroundAlpha / 100),
                 radialEnabled: PARAMS.radialEnabled,
                 radialStrength: PARAMS.radialStrength / 100,
@@ -2158,6 +2961,7 @@
             MONITOR.pathfinders = 0;
             sourceImage.classList.remove('hidden');
             drawFaceOverlay();
+            OriginSelector.reset();
         }
 
         // ============ EXPORT: PNG ============
@@ -2232,12 +3036,30 @@
             PARAMS.speed = p.speed || 8;
             PARAMS.turningAngle = p.turningAngle || 1;
             PARAMS.pixelSize = p.pixelSize || 8;
+            if (p.sampleSize != null) PARAMS.sampleSize = p.sampleSize;
+            if (p.lineOpacity != null) PARAMS.lineOpacity = p.lineOpacity;
+            if (p.jitter != null) PARAMS.jitter = p.jitter;
+            if (p.stepsPerFrame != null) PARAMS.stepsPerFrame = p.stepsPerFrame;
+            if (p.alphaThreshold != null) PARAMS.alphaThreshold = p.alphaThreshold;
             pixelSizeBinding.element.style.display = PARAMS.lineMode === 'pixel-grid' ? '' : 'none';
+            // Apply origin preset using OriginSelector
             var origins = p.origin || ['bottom'];
-            PARAMS.originBottom = origins.includes('bottom');
-            PARAMS.originTop = origins.includes('top');
-            PARAMS.originLeft = origins.includes('left');
-            PARAMS.originRight = origins.includes('right');
+            if (origins.length === 1 && origins[0] === 'bottom') {
+                OriginSelector.applyPreset(''); // Will set default via OriginSelector
+            } else if (origins.length === 4 && origins.includes('top') && origins.includes('bottom') && origins.includes('left') && origins.includes('right')) {
+                OriginSelector.applyPreset('all-edges');
+            } else if (origins.length === 1 && origins[0] === 'center') {
+                OriginSelector.applyPreset('radial-burst');
+            } else {
+                // Convert legacy origin array to weights
+                OriginSelector.weights = {};
+                var perOrigin = Math.floor(100 / origins.length);
+                var remainder = 100 - (perOrigin * origins.length);
+                origins.forEach(function(origin, idx) {
+                    OriginSelector.weights[origin] = perOrigin + (idx < remainder ? 1 : 0);
+                });
+                OriginSelector.updateUI();
+            }
             PARAMS.radialEnabled = p.radialEnabled || false;
             PARAMS.radialStrength = p.radialStrength || 50;
             PARAMS.radialRadius = p.radialRadius || 40;
@@ -2463,7 +3285,100 @@
         }, 250);
 
         // ============ INIT ============
+        OriginSelector.init();
         rebuildSavedPresets();
+
+        // ============ MODE TOGGLE (Simple / Advanced) ============
+        var simpleMode = false;
+        var simpleFileInput = document.createElement('input');
+        simpleFileInput.type = 'file';
+        simpleFileInput.accept = 'image/*';
+        simpleFileInput.style.display = 'none';
+        document.body.appendChild(simpleFileInput);
+
+        document.getElementById('modeToggle').addEventListener('click', function(e) {
+            var btn = e.target.closest('button[data-mode]');
+            if (!btn) return;
+            var mode = btn.dataset.mode;
+            simpleMode = (mode === 'simple');
+            document.body.classList.toggle('simple-mode', simpleMode);
+            document.querySelectorAll('#modeToggle button').forEach(function(b) {
+                b.classList.toggle('active', b.dataset.mode === mode);
+            });
+            // Update simple drop hint visibility
+            var hint = document.getElementById('simpleDropHint');
+            if (simpleMode && (!sourceImage.src || sourceImage.classList.contains('hidden'))) {
+                hint.style.display = 'flex';
+            } else {
+                hint.style.display = '';
+            }
+        });
+
+        // Simple mode: click canvas to toggle, or load image if none loaded
+        document.getElementById('canvasContainer').addEventListener('click', function(e) {
+            if (!simpleMode) return;
+            if (e.target.closest('#modeToggle')) return;
+            if (!sourceImage.src || sourceImage.classList.contains('hidden')) {
+                simpleFileInput.click();
+                return;
+            }
+            if (!chromata) {
+                // Start with simple defaults
+                chromata = new Chromata(sourceImage, {
+                    pathFinderCount: 50,
+                    speed: 5,
+                    originWeights: { 'bottom': 100 }
+                });
+                chromata.start();
+                isRunning = true;
+                MONITOR.status = 'Running';
+            } else {
+                chromata.toggle();
+                isRunning = !isRunning;
+                MONITOR.status = isRunning ? 'Running' : 'Paused';
+            }
+        });
+
+        // Simple mode: drag & drop on canvas
+        var canvasContainer = document.getElementById('canvasContainer');
+        canvasContainer.addEventListener('dragover', function(e) {
+            if (!simpleMode) return;
+            e.preventDefault();
+        });
+        canvasContainer.addEventListener('drop', function(e) {
+            if (!simpleMode) return;
+            e.preventDefault();
+            var file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                loadImageSimple(file);
+            }
+        });
+
+        simpleFileInput.addEventListener('change', function(e) {
+            if (e.target.files[0]) loadImageSimple(e.target.files[0]);
+        });
+
+        function loadImageSimple(file) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                if (chromata) { chromata.reset(); chromata = null; isRunning = false; }
+                sourceImage.onload = function() {
+                    sourceImage.classList.remove('hidden');
+                    document.getElementById('simpleDropHint').style.display = 'none';
+                    // Auto-start in simple mode
+                    chromata = new Chromata(sourceImage, {
+                        pathFinderCount: 50,
+                        speed: 5,
+                        originWeights: { 'bottom': 100 }
+                    });
+                    chromata.start();
+                    isRunning = true;
+                    MONITOR.status = 'Running';
+                };
+                sourceImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
 
         // ============ FACE-API MODEL LOADER ============
         (async function() {
