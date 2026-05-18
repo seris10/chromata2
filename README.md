@@ -4,11 +4,16 @@ A custom build of [Chromata](https://github.com/michaelbromley/chromata) by Mich
 
 I added many new controls and expanded those present in the original, and plan to continue improving and expanding the abilities of Bromley's fantastic app.
 
+---
+
 Things to come:
 - A collection of improvements of new parameters, ranging from small tweaks to substantial functionality.
 - A number of additional parameters, including context-aware presets and dynamic toggles
+- Local desktop app with gallery & collections
+- Online fourm for sharing presets, outputs, functions, and ideas
+- Chromata slideshow maker
 
-Live: https://chromata-dev.pages.dev
+---
 
 ## What this build adds
 
