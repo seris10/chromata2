@@ -1,8 +1,12 @@
-# Chromata
+# Chromatwo
 
 A custom build of [Chromata](https://github.com/michaelbromley/chromata) by Michael Bromley. Chromata seeds path finders on a canvas; each one reads pixel colors and traces its own way across the image, gradually redrawing it as an animated artwork.
 
-I added many 
+I added many new controls and expanded those present in the original, and plan to continue improving and expanding the abilities of Bromley's fantastic app.
+
+Things to come:
+- A collection of improvements of new parameters, ranging from small tweaks to substantial functionality.
+- A number of additional parameters, including context-aware presets and dynamic toggles
 
 Live: https://chromata-dev.pages.dev
 
@@ -41,6 +45,7 @@ The editor at `index.html` extends the upstream library with:
 - **User Presets:** Within app search of community presets
 - **Natural Math:** Adding more options, plus tightening the execution of these effects for more representative output, especially in combination with other parameters.
 - **Force Nodes:** adding more visual feedback for placement and constraints of force nodes and natural math; possibly drag-and-drop functionality
+- **Context-Aware Presets and Dynamic Toggles:** Although these will likely require manual selection in cases of complex images, I hope to add some level of descriptive image detection, to allow for config recommendations and regional variability in pathfinder behavior (such as 
 
 ---
 
