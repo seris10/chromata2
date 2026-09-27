@@ -4,8 +4,7 @@
     "description": "Path-tracing visual effects library for images",
     "original_author": "Michael Bromley",
     "custom_extensions_by": "kjr",
-    "last_updated": "2026-03-01",
-    "source_path": "/Users/kreed/workspace/chromata/"
+    "last_updated": "2026-03-01"
   },
 
   "files": {
